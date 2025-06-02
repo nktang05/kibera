@@ -359,14 +359,18 @@ display: none;
 <h3>Data Cleaning</h3>
 <pre class="r"><code># read in data
 setwd(&quot;~/Desktop/GRIT/Kibera&quot;)
-data &lt;- read.csv(&quot;~/Desktop/GRIT/Kibera/kibera_data.csv&quot;)</code></pre>
+data &lt;- fread(&quot;~/Desktop/GRIT/Kibera/kibera_values_data.csv&quot;)
+
+setnames(data, as.character(unlist(data[1, ])))
+
+data &lt;- data[-1, ]</code></pre>
 <pre class="r"><code># get rid on unnecessary data columns
 data$StartDate&lt;- NULL
 data$EndDate&lt;- NULL
 data$Status&lt;- NULL
 data$IPAddress&lt;- NULL
 data$Progress&lt;- NULL
-data$Duration..in.seconds.&lt;- NULL
+data$&#39;Duration (in seconds)&#39;&lt;- NULL
 data$Finished&lt;- NULL
 data$ RecordedDate&lt;- NULL
 data$ResponseId&lt;- NULL
@@ -381,8 +385,11 @@ data$UserLanguage&lt;- NULL
 
 
 #summary(data)</code></pre>
+<pre class="r"><code># check and data types
+data[, &quot;1.1&quot; := as.integer(data[[&quot;1.1&quot;]])]</code></pre>
+<pre><code>## Warning in eval(jsub, SDenv, parent.frame()): NAs introduced by coercion</code></pre>
 <pre class="r"><code># write new csv of clean data
-fwrite(data, &quot;kibera_cleaned.csv&quot;)</code></pre>
+fwrite(data, &quot;kibera_values_cleaned.csv&quot;)</code></pre>
 </div>
 
 
