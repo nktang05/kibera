@@ -4,6 +4,8 @@ output: html_document
 date: "2025-06-02"
 ---
 
+Linke to Git repo: https://github.com/nktang05/kibera.git
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require(mlr3learners) 
