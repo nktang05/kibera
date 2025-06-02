@@ -1,0 +1,79 @@
+---
+title: "Kibera"
+output: html_document
+date: "2025-06-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(mlr3learners) 
+require(kknn)  
+require(class)
+require(ggplot2)
+library(mlr3)
+library(mlr3viz)
+library(ggplot2)
+library(data.table)
+```
+
+
+
+### Data Cleaning
+
+```{r}
+# read in data
+setwd("~/Desktop/GRIT/Kibera")
+data <- read.csv("~/Desktop/GRIT/Kibera/kibera_data.csv")
+```
+
+
+```{r}
+# get rid on unnecessary data columns
+data$StartDate<- NULL
+data$EndDate<- NULL
+data$Status<- NULL
+data$IPAddress<- NULL
+data$Progress<- NULL
+data$Duration..in.seconds.<- NULL
+data$Finished<- NULL
+data$ RecordedDate<- NULL
+data$ResponseId<- NULL
+data$RecipientLastName<- NULL
+data$RecipientFirstName<- NULL
+data$RecipientEmail<- NULL
+data$ExternalReference<- NULL
+data$LocationLatitude<- NULL
+data$LocationLongitude<- NULL
+data$DistributionChannel<- NULL
+data$UserLanguage<- NULL
+
+
+#summary(data)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# write new csv of clean data
+fwrite(data, "kibera_cleaned.csv")
+```
+
