@@ -1,6 +1,16 @@
 ---
 title: "Kibera"
-output: html_document
+output: 
+  html_document:
+    self_contained: true
+    toc: true
+    number_sections: true
+    theme: flatly
+    # other html options here
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, 
+                    encoding = encoding,
+                    output_file = 'index.html')
 date: "2025-06-02"
 ---
 
