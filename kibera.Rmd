@@ -4,7 +4,7 @@ output: html_document
 date: "2025-06-02"
 ---
 
-Linke to Git repo: https://github.com/nktang05/kibera.git
+Link to Git repo: https://github.com/nktang05/kibera.git
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -67,6 +67,17 @@ data[, "1.1" := as.integer(data[["1.1"]])]
 
 ```
 
+```{r}
+# delete over 20 and under 13
+data <- data[data$'2.1' <= 20, ]
+data <- data[data$'2.1' >= 13, ]
+
+
+# delete if gender is NA
+data <- data[!is.na('2.2')]
+# delete in age is NA
+data <- data[!is.na('2.1')]
+```
 
 
 
@@ -74,6 +85,9 @@ data[, "1.1" := as.integer(data[["1.1"]])]
 
 
 
+```{r}
+summary(data)
+```
 
 
 
