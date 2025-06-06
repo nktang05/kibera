@@ -19,19 +19,63 @@ library(mlr3viz)
 library(ggplot2)
 library(data.table)
 library(sqldf)
+library(ggplot2)
 
 ```
 
 ```{r}
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
-dataClean <- fread("~/Desktop/GRIT/Kibera/kibera_values_cleaned.csv")
-setnames(dataClean, as.character(unlist(dataClean[1, ])))
 
-dataClean <- dataClean[-1, ]
+# Step 1: Read the raw data *without* header
+dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
+
 ```
+
+
 
 ```{r}
 #summary(dataClean)
 ```
+
+```{r}
+
+ggplot(dataClean, aes(x = `2.1`)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  labs(title = "Histogram of Age", x = "2.1", y = "Count") +
+  theme_minimal()
+
+
+```
+
+
+
+```{r}
+# Assume gender is stored in column '2.2'
+dataClean$`2.2` <- factor(dataClean$`2.2`, 
+                          levels = c("1", "2"), 
+                          labels = c("Female", "Male"))
+
+
+
+class(dataClean$'2.2')
+ggplot(dataClean, aes(x = `2.1`, fill = `2.2`)) +
+  geom_histogram(binwidth = 1, color = "white", position = "dodge", alpha = 0.6) +
+  labs(title = "Histogram of Age by Gender", x = "Age", y = "Count") +
+  theme_minimal()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 

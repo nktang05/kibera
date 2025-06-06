@@ -6,7 +6,8 @@ date: "2025-06-02"
 
 Link to Git repo: https://github.com/nktang05/kibera.git
 
-Link to Analysis: /Users/nicoletang/Desktop/GRIT/Kibera/kibera.html
+Link to Analysis: https://nktang05.github.io/kibera/KiberaAnalysis.html
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -66,7 +67,6 @@ data$"5.1_5_TEXT"<- NULL
 data$"5.12_6_TEXT"<- NULL
 
 
-
 #summary(data)
 
 ```
@@ -82,14 +82,17 @@ data[, "1.1" := as.integer(data[["1.1"]])]
 
 ```{r}
 # delete over 20 and under 13
+data$`2.1` <- as.integer(data$`2.1`)
 data <- data[data$'2.1' <= 20, ]
 data <- data[data$'2.1' >= 13, ]
 
 
-# delete if gender is NA
-data <- data[!is.na('2.2')]
-# delete in age is NA
-data <- data[!is.na('2.1')]
+
+# Remove rows where gender is NA or an empty string
+data <- data[!is.na(`2.2`) & `2.2` != "", ]
+
+# delete in age is is NA or an empty string
+data <- data[!is.na(`2.1`) & `2.1` != "", ]
 
 
 ```
@@ -161,6 +164,7 @@ sqldf("SELECT [2.2], [3.7]
 sqldf("SELECT [3.8], [3.9]
        FROM data 
        WHERE [3.8] != 1 AND [3.9] != ''")
+
 ```
 
 

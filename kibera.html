@@ -356,8 +356,7 @@ display: none;
 
 
 <p>Link to Git repo: <a href="https://github.com/nktang05/kibera.git" class="uri">https://github.com/nktang05/kibera.git</a></p>
-<p>Link to Analysis:
-/Users/nicoletang/Desktop/GRIT/Kibera/kibera.html</p>
+<p>Link to Analysis: <a href="https://nktang05.github.io/kibera/KiberaAnalysis.html" class="uri">https://nktang05.github.io/kibera/KiberaAnalysis.html</a></p>
 <div id="data-cleaning" class="section level3">
 <h3>Data Cleaning</h3>
 <pre class="r"><code># read in data
@@ -395,20 +394,23 @@ data$&quot;5.1_5_TEXT&quot;&lt;- NULL
 data$&quot;5.12_6_TEXT&quot;&lt;- NULL
 
 
-
 #summary(data)</code></pre>
 <pre class="r"><code># check and data types
 data[, &quot;1.1&quot; := as.integer(data[[&quot;1.1&quot;]])]</code></pre>
 <pre><code>## Warning in eval(jsub, SDenv, parent.frame()): NAs introduced by coercion</code></pre>
 <pre class="r"><code># delete over 20 and under 13
-data &lt;- data[data$&#39;2.1&#39; &lt;= 20, ]
+data$`2.1` &lt;- as.integer(data$`2.1`)</code></pre>
+<pre><code>## Warning: NAs introduced by coercion</code></pre>
+<pre class="r"><code>data &lt;- data[data$&#39;2.1&#39; &lt;= 20, ]
 data &lt;- data[data$&#39;2.1&#39; &gt;= 13, ]
 
 
-# delete if gender is NA
-data &lt;- data[!is.na(&#39;2.2&#39;)]
-# delete in age is NA
-data &lt;- data[!is.na(&#39;2.1&#39;)]</code></pre>
+
+# Remove rows where gender is NA or an empty string
+data &lt;- data[!is.na(`2.2`) &amp; `2.2` != &quot;&quot;, ]
+
+# delete in age is is NA or an empty string
+data &lt;- data[!is.na(`2.1`) &amp; `2.1` != &quot;&quot;, ]</code></pre>
 <pre class="r"><code>#CHECK FOR MALE CONDITIONALS
 #change pregnant to NA if indicated Yes and Male
 data$&#39;4.8&#39;[data$&#39;2.2&#39; == 2 &amp; data$&#39;4.8&#39; == 1] &lt;- NA
@@ -445,14 +447,13 @@ sqldf(&quot;SELECT [1.2], COUNT(*) as count
 ## 11     270     2
 ## 12     271     2
 ## 13      30     3
-## 14     345     2
-## 15 426-427     2
-## 16     436     2
-## 17     444     2
-## 18     451     2
-## 19     456     2
-## 20     543     3
-## 21     607     2</code></pre>
+## 14 426-427     2
+## 15     436     2
+## 16     444     2
+## 17     451     2
+## 18     456     2
+## 19     543     3
+## 20     607     2</code></pre>
 <pre class="r"><code>#query checker for if male said they were pregnant
 sqldf(&quot;SELECT [2.2], [4.8] 
       FROM data 
