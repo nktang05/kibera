@@ -6,6 +6,8 @@ date: "2025-06-02"
 
 Link to Git repo: https://github.com/nktang05/kibera.git
 
+Link to Analysis: /Users/nicoletang/Desktop/GRIT/Kibera/kibera.html
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require(mlr3learners) 

@@ -1,0 +1,37 @@
+---
+title: "Kibera Analysis"
+output: html_document
+date: "2025-06-06"
+---
+
+Link to Git repo: https://github.com/nktang05/kibera.git
+
+Link to Kibera Data Cleaning: https://nktang05.github.io/kibera/kibera.html
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(mlr3learners) 
+require(kknn)  
+require(class)
+require(ggplot2)
+library(mlr3)
+library(mlr3viz)
+library(ggplot2)
+library(data.table)
+library(sqldf)
+
+```
+
+```{r}
+# read in data
+setwd("~/Desktop/GRIT/Kibera")
+dataClean <- fread("~/Desktop/GRIT/Kibera/kibera_values_cleaned.csv")
+setnames(dataClean, as.character(unlist(dataClean[1, ])))
+
+dataClean <- dataClean[-1, ]
+```
+
+```{r}
+#summary(dataClean)
+```
+
