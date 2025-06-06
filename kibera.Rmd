@@ -16,6 +16,8 @@ library(mlr3)
 library(mlr3viz)
 library(ggplot2)
 library(data.table)
+library(sqldf)
+
 ```
 
 
@@ -52,6 +54,15 @@ data$LocationLatitude<- NULL
 data$LocationLongitude<- NULL
 data$DistributionChannel<- NULL
 data$UserLanguage<- NULL
+data$"2.11_7_TEXT"<- NULL
+data$"2.13_7_TEXT"<- NULL
+data$"2.20_5_TEXT"<- NULL
+data$"3.2_8_TEXT"<- NULL
+data$"3.16_6_TEXT"<- NULL
+data$"4.21_5_TEXT"<- NULL
+data$"5.1_5_TEXT"<- NULL
+data$"5.12_6_TEXT"<- NULL
+
 
 
 #summary(data)
@@ -77,19 +88,83 @@ data <- data[data$'2.1' >= 13, ]
 data <- data[!is.na('2.2')]
 # delete in age is NA
 data <- data[!is.na('2.1')]
+
+
 ```
 
 
+```{r}
+#CHECK FOR MALE CONDITIONALS
+#change pregnant to NA if indicated Yes and Male
+data$'4.8'[data$'2.2' == 2 & data$'4.8' == 1] <- NA
 
+#change menstual to NA if indicated Yes and Male
+data$'3.1'[data$'2.2' == 2 & (data[["3.1"]] == 1 | data[["3.1"]] == 2)] <- NA
+# change menstrual age to NA if age and Male
+data[["3.1_1_TEXT"]][data[["2.2"]] == 2 & data[["3.1_1_TEXT"]] != ""] <- NA
+# change menstrual prodict to NA if age and Male
+data[["3.2"]][data[["2.2"]] == 2 & data[["3.2"]] != ""] <- NA
+data[["3.3"]][data[["2.2"]] == 2 & data[["3.3"]] != ""] <- NA
+data[["3.4"]][data[["2.2"]] == 2 & data[["3.4"]] != ""] <- NA
+data[["3.5"]][data[["2.2"]] == 2 & data[["3.5"]] != ""] <- NA
+data[["3.6"]][data[["2.2"]] == 2 & data[["3.6"]] != ""] <- NA
+data[["3.7"]][data[["2.2"]] == 2 & data[["3.7"]] != ""] <- NA
+```
+
+```{r}
+#CHECK FOR SEX ACTIVITY CONDITIONALS
+data[["3.9"]][data[["2.2"]] != 1 & data[["3.9"]] != ""] <- NA
+
+
+
+```
 
 
 
 
 ```{r}
-summary(data)
+#query to see duplicate village numbers
+sqldf("SELECT [1.2], COUNT(*) as count 
+       FROM data 
+       GROUP BY [1.2] 
+       HAVING COUNT(*) > 1")
 ```
 
 
+```{r}
+#query checker for if male said they were pregnant
+sqldf("SELECT [2.2], [4.8] 
+      FROM data 
+      WHERE [2.2] = 2 AND [4.8] = 1")
+#query for male menstration
+sqldf("SELECT [2.2], [3.1] 
+      FROM data 
+      WHERE [2.2] = 2 AND ([3.1] = 1 OR [3.1] = 2)")
+#query for male menstration age
+sqldf("SELECT [2.2], [3.1_1_TEXT]
+       FROM data 
+       WHERE [2.2] = 2 AND [3.1_1_TEXT] != ''")
+sqldf("SELECT [2.2], [3.2]
+       FROM data 
+       WHERE [2.2] = 2 AND [3.2] != ''")
+#3.3,3.4,3.5,3.6,3.7
+sqldf("SELECT [2.2], [3.7]
+       FROM data 
+       WHERE [2.2] = 2 AND [3.7] != ''")
+
+
+```
+```{r}
+# query for sex conditionals
+sqldf("SELECT [3.8], [3.9]
+       FROM data 
+       WHERE [3.8] != 1 AND [3.9] != ''")
+```
+
+
+```{r}
+#summary(data)
+```
 
 
 ```{r}
