@@ -20,7 +20,11 @@ library(mlr3viz)
 library(ggplot2)
 library(data.table)
 library(sqldf)
-
+library(codebookr)
+library(codebook)
+library(dplyr)
+library(haven)
+library(labelled)
 ```
 
 
@@ -30,11 +34,8 @@ library(sqldf)
 ```{r}
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
-data <- fread("~/Desktop/GRIT/Kibera/kibera_values_data.csv")
+data <- fread("~/Desktop/GRIT/Kibera/kibera_values_data.csv", header = TRUE)
 
-setnames(data, as.character(unlist(data[1, ])))
-
-data <- data[-1, ]
 ```
 
 
@@ -69,30 +70,66 @@ data$"5.12_6_TEXT"<- NULL
 
 #summary(data)
 
+#set aside variable labels
+variable_labels <- as.character(unlist(data[1, ]))
+# drop non data rows
+data <- data[-c(1, 2), ]
+
+# change names of 
+names(data) <- ifelse(grepl("^[0-9]", names(data)),
+                      paste0("x", names(data)),
+                      names(data))
+
 ```
 
 
 
 
 ```{r}
-# check and data types
-data[, "1.1" := as.integer(data[["1.1"]])]
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  data[[col]] <- as.numeric(as.character(data[[col]]))
+}
 
+# make var date
+data$x1.4 <- as.Date(data$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  data[[col]] <- as.character(data[[col]])
+}
+
+# make var factor
+allVars <- names(data)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  data[[col]] <- as.factor(data[[col]])
+}
+
+
+names(data)
+summary(data)
 ```
 
 ```{r}
 # delete over 20 and under 13
-data$`2.1` <- as.integer(data$`2.1`)
-data <- data[data$'2.1' <= 20, ]
-data <- data[data$'2.1' >= 13, ]
+data <- data[data$'x2.1' <= 20, ]
+data <- data[data$'x2.1' >= 13, ]
 
 
 
 # Remove rows where gender is NA or an empty string
-data <- data[!is.na(`2.2`) & `2.2` != "", ]
+data <- data[!is.na(`x2.2`) & `x2.2` != "", ]
 
 # delete in age is is NA or an empty string
-data <- data[!is.na(`2.1`) & `2.1` != "", ]
+data <- data[!is.na(`x2.1`) & `x2.1` != "", ]
 
 
 ```
@@ -101,80 +138,103 @@ data <- data[!is.na(`2.1`) & `2.1` != "", ]
 ```{r}
 #CHECK FOR MALE CONDITIONALS
 #change pregnant to NA if indicated Yes and Male
-data$'4.8'[data$'2.2' == 2 & data$'4.8' == 1] <- NA
+data$'x4.8'[data$'x2.2' == 2 & data$'x4.8' == 1] <- NA
 
 #change menstual to NA if indicated Yes and Male
-data$'3.1'[data$'2.2' == 2 & (data[["3.1"]] == 1 | data[["3.1"]] == 2)] <- NA
+data$'x3.1'[data$'x2.2' == 2 & (data[["x3.1"]] == 1 | data[["x3.1"]] == 2)] <- NA
 # change menstrual age to NA if age and Male
-data[["3.1_1_TEXT"]][data[["2.2"]] == 2 & data[["3.1_1_TEXT"]] != ""] <- NA
+data[["x3.1_1_TEXT"]][data[["x2.2"]] == 2 & data[["x3.1_1_TEXT"]] != ""] <- NA
 # change menstrual prodict to NA if age and Male
-data[["3.2"]][data[["2.2"]] == 2 & data[["3.2"]] != ""] <- NA
-data[["3.3"]][data[["2.2"]] == 2 & data[["3.3"]] != ""] <- NA
-data[["3.4"]][data[["2.2"]] == 2 & data[["3.4"]] != ""] <- NA
-data[["3.5"]][data[["2.2"]] == 2 & data[["3.5"]] != ""] <- NA
-data[["3.6"]][data[["2.2"]] == 2 & data[["3.6"]] != ""] <- NA
-data[["3.7"]][data[["2.2"]] == 2 & data[["3.7"]] != ""] <- NA
+data[["x3.2"]][data[["x2.2"]] == 2 & data[["x3.2"]] != ""] <- NA
+data[["x3.3"]][data[["x2.2"]] == 2 & data[["x3.3"]] != ""] <- NA
+data[["x3.4"]][data[["x2.2"]] == 2 & data[["x3.4"]] != ""] <- NA
+data[["x3.5"]][data[["x2.2"]] == 2 & data[["x3.5"]] != ""] <- NA
+data[["x3.6"]][data[["x2.2"]] == 2 & data[["x3.6"]] != ""] <- NA
+data[["x3.7"]][data[["x2.2"]] == 2 & data[["x3.7"]] != ""] <- NA
 ```
 
 ```{r}
 #CHECK FOR SEX ACTIVITY CONDITIONALS
-data[["3.9"]][data[["2.2"]] != 1 & data[["3.9"]] != ""] <- NA
+data[["x3.9"]][data[["x2.2"]] != 1 & data[["x3.9"]] != ""] <- NA
 
 
 
 ```
 
 
-
-
 ```{r}
 #query to see duplicate village numbers
-sqldf("SELECT [1.2], COUNT(*) as count 
+sqldf("SELECT [x1.2], COUNT(*) as count 
        FROM data 
-       GROUP BY [1.2] 
+       GROUP BY [x1.2] 
        HAVING COUNT(*) > 1")
 ```
 
 
 ```{r}
 #query checker for if male said they were pregnant
-sqldf("SELECT [2.2], [4.8] 
+sqldf("SELECT [x2.2], [x4.8] 
       FROM data 
-      WHERE [2.2] = 2 AND [4.8] = 1")
+      WHERE [x2.2] = 2 AND [x4.8] = 1")
 #query for male menstration
-sqldf("SELECT [2.2], [3.1] 
+sqldf("SELECT [x2.2], [x3.1] 
       FROM data 
-      WHERE [2.2] = 2 AND ([3.1] = 1 OR [3.1] = 2)")
+      WHERE [x2.2] = 2 AND ([x3.1] = 1 OR [x3.1] = 2)")
 #query for male menstration age
-sqldf("SELECT [2.2], [3.1_1_TEXT]
+sqldf("SELECT [x2.2], [x3.1_1_TEXT]
        FROM data 
-       WHERE [2.2] = 2 AND [3.1_1_TEXT] != ''")
-sqldf("SELECT [2.2], [3.2]
+       WHERE [x2.2] = 2 AND [x3.1_1_TEXT] != ''")
+sqldf("SELECT [x2.2], [x3.2]
        FROM data 
-       WHERE [2.2] = 2 AND [3.2] != ''")
+       WHERE [x2.2] = 2 AND [x3.2] != ''")
 #3.3,3.4,3.5,3.6,3.7
-sqldf("SELECT [2.2], [3.7]
+sqldf("SELECT [x2.2], [x3.7]
        FROM data 
-       WHERE [2.2] = 2 AND [3.7] != ''")
+       WHERE [x2.2] = 2 AND [x3.7] != ''")
 
 
 ```
 ```{r}
 # query for sex conditionals
-sqldf("SELECT [3.8], [3.9]
+sqldf("SELECT [x3.8], [x3.9]
        FROM data 
-       WHERE [3.8] != 1 AND [3.9] != ''")
+       WHERE [x3.8] != 1 AND [x3.9] != ''")
 
 ```
+### Make Codebook
 
+
+```{r}
+#make variable codebook
+codebook_output <- codebook(data)
+
+# make label variables
+for (i in seq_along(data)) {
+  var_label(data[[i]]) <- variable_labels[i]
+}
+#test for success
+#var_label(data)
+```
+
+```{r}
+data$x2.2 <- labelled(
+  as.integer(data$x2.2),  # Ensure it's numeric or integer
+  labels = c("Yes" = 1, "No" = 2)
+)
+```
 
 ```{r}
 #summary(data)
+
+summary(data$x2.1)
 ```
 
-
+### Export clean data and codebook
 ```{r}
 # write new csv of clean data
 fwrite(data, "kibera_values_cleaned.csv")
+
+#write codebook
+saveRDS(data, file = "codebook.rds")
 ```
 

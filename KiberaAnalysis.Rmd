@@ -26,9 +26,9 @@ library(ggplot2)
 ```{r}
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
-
-# Step 1: Read the raw data *without* header
 dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
+
+dataClean <- readRDS("codebook.rds")
 
 ```
 
@@ -40,35 +40,38 @@ dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
 
 ```{r}
 
-ggplot(dataClean, aes(x = `2.1`)) +
-  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
-  labs(title = "Histogram of Age", x = "2.1", y = "Count") +
-  theme_minimal()
+dataClean$x2.1 <- as.numeric(as.character(dataClean$x2.1))
 
+summary(dataClean$x2.1)
+
+ggplot(dataClean, aes(x = x2.1)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  labs(title = "Histogram of Age", x = "Age", y = "Count") +
+  theme_minimal()
 
 ```
 
 
 
 ```{r}
-# Assume gender is stored in column '2.2'
-dataClean$`2.2` <- factor(dataClean$`2.2`, 
-                          levels = c("1", "2"), 
-                          labels = c("Female", "Male"))
 
+class(dataClean$'x2.2')
 
-
-class(dataClean$'2.2')
-ggplot(dataClean, aes(x = `2.1`, fill = `2.2`)) +
+ggplot(dataClean, aes(x = `x2.1`, fill = `x2.2`)) +
   geom_histogram(binwidth = 1, color = "white", position = "dodge", alpha = 0.6) +
   labs(title = "Histogram of Age by Gender", x = "Age", y = "Count") +
   theme_minimal()
+
+summary(dataClean$x2.1)
 
 ```
 
 
 
 
+```{r}
+
+```
 
 
 
