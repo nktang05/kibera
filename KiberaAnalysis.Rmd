@@ -27,12 +27,74 @@ library(labelled)
 ```{r}
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
-dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
 
-dataClean <- readRDS("codebook.rds")
+dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
+labelled_data <- readRDS("codebook_labelled_data.rds")
 
 ```
 
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  dataClean[[col]] <- as.numeric(as.character(dataClean[[col]]))
+}
+
+# make var date
+dataClean$x1.4 <- as.Date(dataClean$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  dataClean[[col]] <- as.character(dataClean[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(dataClean)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  dataClean[[col]] <- as.character(dataClean[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(dataClean), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(dataClean[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(dataClean[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(dataClean[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+# Pick one column (e.g., "x8.9")
+var_label(dataClean[["x8.9"]])
+
+unique(dataClean[["x2.2"]])
+
+str(dataClean[["x8.9"]])
+str(labelled_data[["x8.9"]])
+summary(dataClean$x8.9)
+```
 
 
 ```{r}
@@ -54,24 +116,32 @@ ggplot(dataClean, aes(x = x2.1)) +
 
 
 
+
+
 ```{r}
 
-ggplot(dataClean, aes(x = `x2.1`, fill = `x2.2`)) +
+dataClean$x2.2_factor <- to_factor(dataClean$x2.2, levels = "label")
+
+ggplot(dataClean, aes(x = `x2.1`, fill = `x2.2_factor`)) +
   geom_histogram(binwidth = 1, color = "white", position = "dodge", alpha = 0.6) +
+  scale_fill_manual(values = c("Female" = "#E91E63", "Male" = "#2196F3")) +
   labs(title = "Histogram of Age by Gender", x = "Age", y = "Count") +
   theme_minimal()
 
-summary(dataClean$x2.1)
-
 ```
-
-
-
 
 ```{r}
+sqldf("
+  SELECT
+    [x2.2_factor],
+    [x2.1],
+    COUNT(*) AS count
+  FROM dataClean
+  GROUP BY [x2.2_factor], [x2.1]
+  ORDER BY [x2.2_factor], [x2.1]
+")
 
 ```
-
 
 
 

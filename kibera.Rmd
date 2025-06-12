@@ -27,11 +27,6 @@ library(haven)
 library(labelled)
 ```
 
-```{r}
-# dafsdasdf
-print("hello world")
-```
-
 
 ### Data Cleaning
 
@@ -77,7 +72,7 @@ variable_labels <- as.character(unlist(data[1, ]))
 # drop non data rows
 data <- data[-c(1, 2), ]
 
-# change names of 
+# change names of
 names(data) <- ifelse(grepl("^[0-9]", names(data)),
                       paste0("x", names(data)),
                       names(data))
@@ -109,6 +104,19 @@ for (col in charVars) {
 #for (col in factorVars) {
   #data[[col]] <- as.factor(data[[col]])
 #}
+
+
+allVars <- names(data)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  data[[col]] <- as.numeric(as.character(data[[col]]))
+}
+
+
+
 
 
 #names(data)
@@ -206,34 +214,36 @@ sqldf("SELECT [x3.8], [x3.9]
 
 ```{r}
 #make variable codebook
-codebook_output <- codebook(data)
-
-# make label variables
-for (i in seq_along(data)) {
-  var_label(data[[i]]) <- variable_labels[i]
-}
+# codebook_output <- codebook(data)
+# 
+# # make label variables
+# for (i in seq_along(data)) {
+#   var_label(data[[i]]) <- variable_labels[i]
+# }
 #test for success
 #var_label(data)
 ```
 
 ```{r}
 # THIS IS WHERE MORE LABELS NEED TO BE HARDCODED IN
-data$x2.2 <- labelled(
-  x = as.integer(data$x2.2),
-  labels = c("Female" = 1, "Male" = 2)
-)
+# data <- set_value_labels(data, x2.2 = c("Female" = 1, "Male" = 2))
+# 
+# class(data$x2.2)
+# val_labels(data$x2.2)
+# summary(data$x2.2)
+
 ```
 
 ```{r}
 # make factor variables after codebook
-allVars <- names(data)
-excludeVars <- c(numericVars, charVars, "x1.4")
-factorVars <- setdiff(allVars, excludeVars)
-
-
-for (col in factorVars) {
-  data[[col]] <- to_factor(data[[col]], levels = "labels")
-}
+# allVars <- names(data)
+# excludeVars <- c(numericVars, charVars, "x1.4")
+# factorVars <- setdiff(allVars, excludeVars)
+# 
+# 
+# for (col in factorVars) {
+#   data[[col]] <- to_factor(data[[col]], levels = "labels")
+# }
 
 #check
 #class(data$x2.2)
@@ -247,6 +257,13 @@ for (col in factorVars) {
 #summary(data)
 
 #summary(data$x2.2)
+
+for (col in factorVars) {
+  data[[col]] <- as.character(data[[col]])
+}
+
+
+summary(data$x8.9)
 ```
 
 ### Export clean data and codebook
@@ -255,6 +272,6 @@ for (col in factorVars) {
 fwrite(data, "kibera_values_cleaned.csv")
 
 #write codebook
-saveRDS(data, file = "codebook.rds")
+#saveRDS(data, file = "codebook.rds")
 ```
 

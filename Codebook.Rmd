@@ -1,0 +1,124 @@
+---
+title: "Codebook"
+output: html_document
+date: "2025-06-12"
+---
+
+```{r}
+# Load required libraries
+require(mlr3learners) 
+require(kknn)  
+require(class)
+require(ggplot2)
+library(mlr3)
+library(mlr3viz)
+library(ggplot2)
+library(data.table)
+library(sqldf)
+library(codebookr)
+library(codebook)
+library(dplyr)
+library(haven)
+library(labelled)
+library(readr)
+library(tibble)
+
+# Step 1: Read raw data files (coded values + labels)
+data_values <- read_csv("~/Desktop/GRIT/Kibera/kibera_labels.data.csv")
+data_labels <- read_csv("~/Desktop/GRIT/Kibera/kibera_values_data.csv")
+
+# Step 2: Extract variable labels and drop metadata/header rows
+variable_labels <- as.character(unlist(data_values[1, ]))
+data_values <- data_values[-c(1, 2), ]
+data_labels <- data_labels[-c(1, 2), ]
+
+# Step 3: Rename variables that start with numbers
+names(data_values) <- ifelse(grepl("^[0-9]", names(data_values)),
+                             paste0("x", names(data_values)),
+                             names(data_values))
+names(data_labels) <- ifelse(grepl("^[0-9]", names(data_labels)),
+                             paste0("x", names(data_labels)),
+                             names(data_labels))
+
+
+# Determine overlapping variables between data_values and data_labels
+common_cols <- intersect(names(data_values), names(data_labels))
+
+codebook_list <- list()
+
+# Step 4: Build correct label-value mapping (Value = code, Label = text)
+for (col in common_cols) {
+  values <- as.character(data_values[[col]])  # coded values: "1", "2", etc.
+  labels <- as.character(data_labels[[col]])  # text labels: "Female", "Male"
+  
+  df <- data.frame(Value = values, Label = labels, stringsAsFactors = FALSE) %>%
+    filter(!is.na(Value), !is.na(Label)) %>%
+    distinct()
+
+  # ✅ Enforce correct structure: Value = code, Label = label
+  df <- df %>%
+    mutate(Value = as.character(Value), Label = as.character(Label))
+
+  if (nrow(df) > 0 && !all(df$Value == df$Label)) {
+    df$Variable <- col
+    codebook_list[[col]] <- df
+  }
+}
+
+
+
+
+# Step 5: Combine into a long-format codebook
+codebook_df <- bind_rows(codebook_list) %>%
+  select(Variable, Value, Label)
+
+# Step 6: Apply variable labels (question text) to data_values
+for (i in seq_along(data_values)) {
+  var_label(data_values[[i]]) <- variable_labels[i]
+}
+
+# Step 7: Build nested dictionary for value labels
+label_dict <- codebook_df %>%
+  group_by(Variable) %>%
+  summarise(mapping = list(setNames(Label, Value))) %>%
+  deframe()
+
+# Step 8: Apply value labels automatically
+for (var in names(label_dict)) {
+  if (var %in% names(data_values)) {
+    # Ensure variables are character so labels stick
+    data_values[[var]] <- as.character(data_values[[var]])
+    val_labels(data_values[[var]]) <- label_dict[[var]]
+  }
+}
+
+# Step 9: Save codebook CSV
+write_csv(codebook_df, "~/Desktop/GRIT/Kibera/auto_generated_codebook.csv")
+
+# Step 10: Optional – Generate a codebook report (interactive viewer or RMarkdown)
+# Only include non-free-text variables in the summary
+too_unique_vars <- names(data_values)[
+  sapply(data_values, function(x) is.character(x) && (length(unique(x)) > 100 || any(is.na(x))))
+]
+
+
+
+safe_vars <- setdiff(names(data_values), too_unique_vars)
+codebook_output <- codebook(data_values[, safe_vars])
+
+
+
+
+
+
+```
+
+```{r}
+
+#save the codebook
+
+saveRDS(data_values, file = "~/Desktop/GRIT/Kibera/codebook_labelled_data.rds")
+
+
+```
+
