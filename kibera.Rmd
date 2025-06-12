@@ -68,8 +68,6 @@ data$"5.1_5_TEXT"<- NULL
 data$"5.12_6_TEXT"<- NULL
 
 
-#summary(data)
-
 #set aside variable labels
 variable_labels <- as.character(unlist(data[1, ]))
 # drop non data rows
@@ -103,22 +101,20 @@ for (col in charVars) {
   data[[col]] <- as.character(data[[col]])
 }
 
-# make var factor
-allVars <- names(data)
-excludeVars <- c(numericVars, charVars, "x1.4")
-factorVars <- setdiff(allVars, excludeVars)
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
 
 
-for (col in factorVars) {
-  data[[col]] <- as.factor(data[[col]])
-}
-
-
-names(data)
-summary(data)
+#names(data)
+#summary(data)
 ```
 
+
 ```{r}
+
+
 # delete over 20 and under 13
 data <- data[data$'x2.1' <= 20, ]
 data <- data[data$'x2.1' >= 13, ]
@@ -134,7 +130,7 @@ data <- data[!is.na(`x2.1`) & `x2.1` != "", ]
 
 ```
 
-
+### Check for weird conditionals
 ```{r}
 #CHECK FOR MALE CONDITIONALS
 #change pregnant to NA if indicated Yes and Male
@@ -144,7 +140,7 @@ data$'x4.8'[data$'x2.2' == 2 & data$'x4.8' == 1] <- NA
 data$'x3.1'[data$'x2.2' == 2 & (data[["x3.1"]] == 1 | data[["x3.1"]] == 2)] <- NA
 # change menstrual age to NA if age and Male
 data[["x3.1_1_TEXT"]][data[["x2.2"]] == 2 & data[["x3.1_1_TEXT"]] != ""] <- NA
-# change menstrual prodict to NA if age and Male
+# change menstrual predict to NA if age and Male
 data[["x3.2"]][data[["x2.2"]] == 2 & data[["x3.2"]] != ""] <- NA
 data[["x3.3"]][data[["x2.2"]] == 2 & data[["x3.3"]] != ""] <- NA
 data[["x3.4"]][data[["x2.2"]] == 2 & data[["x3.4"]] != ""] <- NA
@@ -217,16 +213,36 @@ for (i in seq_along(data)) {
 ```
 
 ```{r}
+# THIS IS WHERE MORE LABELS NEED TO BE HARDCODED IN
 data$x2.2 <- labelled(
-  as.integer(data$x2.2),  # Ensure it's numeric or integer
-  labels = c("Yes" = 1, "No" = 2)
+  x = as.integer(data$x2.2),
+  labels = c("Female" = 1, "Male" = 2)
 )
 ```
 
 ```{r}
+# make factor variables after codebook
+allVars <- names(data)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  data[[col]] <- to_factor(data[[col]], levels = "labels")
+}
+
+#check
+#class(data$x2.2)
+#levels(data$x2.2) 
+```
+
+
+
+
+```{r}
 #summary(data)
 
-summary(data$x2.1)
+#summary(data$x2.2)
 ```
 
 ### Export clean data and codebook
