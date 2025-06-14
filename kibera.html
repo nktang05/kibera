@@ -361,7 +361,7 @@ display: none;
 <h3>Data Cleaning</h3>
 <pre class="r"><code># read in data
 setwd(&quot;~/Desktop/GRIT/Kibera&quot;)
-data &lt;- fread(&quot;~/Desktop/GRIT/Kibera/kibera_values_data.csv&quot;, header = TRUE)</code></pre>
+data &lt;- fread(&quot;~/Desktop/GRIT/Kibera/originalCsv/kibera_values_data.csv&quot;, header = TRUE)</code></pre>
 <pre class="r"><code># get rid on unnecessary data columns
 data$StartDate&lt;- NULL
 data$EndDate&lt;- NULL
@@ -543,56 +543,10 @@ sqldf(&quot;SELECT [x3.8], [x3.9]
 <pre><code>## [1] x3.8 x3.9
 ## &lt;0 rows&gt; (or 0-length row.names)</code></pre>
 </div>
-<div id="make-codebook" class="section level3">
-<h3>Make Codebook</h3>
-<pre class="r"><code>#make variable codebook
-# codebook_output &lt;- codebook(data)
-# 
-# # make label variables
-# for (i in seq_along(data)) {
-#   var_label(data[[i]]) &lt;- variable_labels[i]
-# }
-#test for success
-#var_label(data)</code></pre>
-<pre class="r"><code># THIS IS WHERE MORE LABELS NEED TO BE HARDCODED IN
-# data &lt;- set_value_labels(data, x2.2 = c(&quot;Female&quot; = 1, &quot;Male&quot; = 2))
-# 
-# class(data$x2.2)
-# val_labels(data$x2.2)
-# summary(data$x2.2)</code></pre>
-<pre class="r"><code># make factor variables after codebook
-# allVars &lt;- names(data)
-# excludeVars &lt;- c(numericVars, charVars, &quot;x1.4&quot;)
-# factorVars &lt;- setdiff(allVars, excludeVars)
-# 
-# 
-# for (col in factorVars) {
-#   data[[col]] &lt;- to_factor(data[[col]], levels = &quot;labels&quot;)
-# }
-
-#check
-#class(data$x2.2)
-#levels(data$x2.2) </code></pre>
-<pre class="r"><code>#summary(data)
-
-#summary(data$x2.2)
-
-for (col in factorVars) {
-  data[[col]] &lt;- as.character(data[[col]])
-}
-
-
-summary(data$x8.9)</code></pre>
-<pre><code>##    Length     Class      Mode 
-##       392 character character</code></pre>
-</div>
 <div id="export-clean-data-and-codebook" class="section level3">
 <h3>Export clean data and codebook</h3>
 <pre class="r"><code># write new csv of clean data
-fwrite(data, &quot;kibera_values_cleaned.csv&quot;)
-
-#write codebook
-#saveRDS(data, file = &quot;codebook.rds&quot;)</code></pre>
+fwrite(data, &quot;~/Desktop/GRIT/Kibera/cleanedCsv/kibera_values_cleaned.csv&quot;)</code></pre>
 </div>
 
 

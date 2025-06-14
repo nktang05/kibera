@@ -33,7 +33,7 @@ library(labelled)
 ```{r}
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
-data <- fread("~/Desktop/GRIT/Kibera/kibera_values_data.csv", header = TRUE)
+data <- fread("~/Desktop/GRIT/Kibera/originalCsv/kibera_values_data.csv", header = TRUE)
 
 ```
 
@@ -209,69 +209,13 @@ sqldf("SELECT [x3.8], [x3.9]
        WHERE [x3.8] != 1 AND [x3.9] != ''")
 
 ```
-### Make Codebook
 
 
-```{r}
-#make variable codebook
-# codebook_output <- codebook(data)
-# 
-# # make label variables
-# for (i in seq_along(data)) {
-#   var_label(data[[i]]) <- variable_labels[i]
-# }
-#test for success
-#var_label(data)
-```
-
-```{r}
-# THIS IS WHERE MORE LABELS NEED TO BE HARDCODED IN
-# data <- set_value_labels(data, x2.2 = c("Female" = 1, "Male" = 2))
-# 
-# class(data$x2.2)
-# val_labels(data$x2.2)
-# summary(data$x2.2)
-
-```
-
-```{r}
-# make factor variables after codebook
-# allVars <- names(data)
-# excludeVars <- c(numericVars, charVars, "x1.4")
-# factorVars <- setdiff(allVars, excludeVars)
-# 
-# 
-# for (col in factorVars) {
-#   data[[col]] <- to_factor(data[[col]], levels = "labels")
-# }
-
-#check
-#class(data$x2.2)
-#levels(data$x2.2) 
-```
-
-
-
-
-```{r}
-#summary(data)
-
-#summary(data$x2.2)
-
-for (col in factorVars) {
-  data[[col]] <- as.character(data[[col]])
-}
-
-
-summary(data$x8.9)
-```
 
 ### Export clean data and codebook
 ```{r}
 # write new csv of clean data
-fwrite(data, "kibera_values_cleaned.csv")
+fwrite(data, "~/Desktop/GRIT/Kibera/cleanedCsv/kibera_values_cleaned.csv")
 
-#write codebook
-#saveRDS(data, file = "codebook.rds")
 ```
 

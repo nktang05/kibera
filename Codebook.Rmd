@@ -24,8 +24,8 @@ library(readr)
 library(tibble)
 
 # Step 1: Read raw data files (coded values + labels)
-data_values <- read_csv("~/Desktop/GRIT/Kibera/kibera_labels.data.csv")
-data_labels <- read_csv("~/Desktop/GRIT/Kibera/kibera_values_data.csv")
+data_values <- read_csv("~/Desktop/GRIT/Kibera/originalCsv/kibera_labels.data.csv")
+data_labels <- read_csv("~/Desktop/GRIT/Kibera/originalCsv/kibera_values_data.csv")
 
 # Step 2: Extract variable labels and drop metadata/header rows
 variable_labels <- as.character(unlist(data_values[1, ]))
@@ -93,7 +93,7 @@ for (var in names(label_dict)) {
 }
 
 # Step 9: Save codebook CSV
-write_csv(codebook_df, "~/Desktop/GRIT/Kibera/auto_generated_codebook.csv")
+write_csv(codebook_df, "~/Desktop/GRIT/Kibera/codebook/auto_generated_codebook.csv")
 
 # Step 10: Optional – Generate a codebook report (interactive viewer or RMarkdown)
 # Only include non-free-text variables in the summary
@@ -117,7 +117,7 @@ codebook_output <- codebook(data_values[, safe_vars])
 
 #save the codebook
 
-saveRDS(data_values, file = "~/Desktop/GRIT/Kibera/codebook_labelled_data.rds")
+saveRDS(data_values, file = "~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
 
 
 ```

@@ -360,8 +360,8 @@ display: none;
 <pre class="r"><code># read in data
 setwd(&quot;~/Desktop/GRIT/Kibera&quot;)
 
-dataClean &lt;- fread(&quot;kibera_values_cleaned.csv&quot;, header = TRUE)
-labelled_data &lt;- readRDS(&quot;codebook_labelled_data.rds&quot;)</code></pre>
+dataClean &lt;- fread(&quot;~/Desktop/GRIT/Kibera/cleanedCsv/kibera_values_cleaned.csv&quot;, header = TRUE)
+labelled_data &lt;- readRDS(&quot;~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds&quot;)</code></pre>
 <pre class="r"><code># make var numeric
 numericVars &lt;- c(&quot;x1.1&quot;, &quot;x1.2&quot;, &quot;x1.3&quot;, &quot;x2.1&quot;, &quot;x3.1_1_TEXT&quot;, &quot;x3.9&quot; )
 for (col in numericVars) {
@@ -513,6 +513,31 @@ ggplot(dataClean, aes(x = `x2.1`, fill = `x2.2_factor`)) +
 ## 14        Male   18    22
 ## 15        Male   19    29
 ## 16        Male   20    18</code></pre>
+<pre class="r"><code>sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x2.2_factor],
+    [x2.1],
+    COUNT(*) AS count
+  FROM dataClean
+  GROUP BY [x2.2_factor], [x2.1]
+  ORDER BY [x2.2_factor], [x2.1]
+&quot;)
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table &lt;- sql_result %&gt;%
+  pivot_wider(
+    names_from = x2.1,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+# Step 3: View the table
+print(pivot_table)</code></pre>
+<pre><code>## # A tibble: 2 × 9
+##   x2.2_factor  `13`  `14`  `15`  `16`  `17`  `18`  `19`  `20`
+##   &lt;fct&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;
+## 1 Female         29    24    19    29    31    42    56    36
+## 2 Male            6     8    19     9    15    22    29    18</code></pre>
 
 
 

@@ -21,6 +21,9 @@ library(data.table)
 library(sqldf)
 library(ggplot2)
 library(labelled)
+library(sqldf)
+library(tidyr)  # for pivot_wider
+library(dplyr)
 
 ```
 
@@ -28,8 +31,8 @@ library(labelled)
 # read in data
 setwd("~/Desktop/GRIT/Kibera")
 
-dataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
-labelled_data <- readRDS("codebook_labelled_data.rds")
+dataClean <- fread("~/Desktop/GRIT/Kibera/cleanedCsv/kibera_values_cleaned.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
 
 ```
 
@@ -143,6 +146,28 @@ sqldf("
 
 ```
 
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.2_factor],
+    [x2.1],
+    COUNT(*) AS count
+  FROM dataClean
+  GROUP BY [x2.2_factor], [x2.1]
+  ORDER BY [x2.2_factor], [x2.1]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x2.1,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+# Step 3: View the table
+print(pivot_table)
+```
 
 
 

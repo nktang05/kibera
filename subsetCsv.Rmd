@@ -1,0 +1,112 @@
+---
+title: "Subset csv"
+output: html_document
+date: "2025-06-13"
+---
+
+
+Link to Git repo: https://github.com/nktang05/kibera.git
+
+Link to Kibera Data Cleaning: https://nktang05.github.io/kibera/kibera.html
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(mlr3learners) 
+require(kknn)  
+require(class)
+require(ggplot2)
+library(mlr3)
+library(mlr3viz)
+library(ggplot2)
+library(data.table)
+library(sqldf)
+library(ggplot2)
+library(labelled)
+library(sqldf)
+library(tidyr)  # for pivot_wider
+library(dplyr)
+
+```
+
+```{r}
+# read in data
+setwd("~/Desktop/GRIT/Kibera")
+
+AlldataClean <- fread("kibera_values_cleaned.csv", header = TRUE)
+Alllabelled_data <- readRDS("codebook_labelled_data.rds")
+
+```
+
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  AlldataClean[[col]] <- as.numeric(as.character(AlldataClean[[col]]))
+}
+
+# make var date
+AlldataClean$x1.4 <- as.Date(AlldataClean$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  AlldataClean[[col]] <- as.character(AlldataClean[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(AlldataClean)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  AlldataClean[[col]] <- as.character(AlldataClean[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(AlldataClean), names(Alllabelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(AlldataClean[[var]]) && !is.numeric(Alllabelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(AlldataClean[[var]]) <- var_label(Alllabelled_data[[var]])
+  val_labels(AlldataClean[[var]]) <- val_labels(Alllabelled_data[[var]])
+}
+
+# Pick one column (e.g., "x8.9")
+var_label(AlldataClean[["x8.9"]])
+
+unique(AlldataClean[["x2.2"]])
+
+str(AlldataClean[["x8.9"]])
+str(Alllabelled_data[["x8.9"]])
+summary(AlldataClean$x8.9)
+```
+
+### subset the csv
+```{r}
+# Replace with your actual column names
+test <- AlldataClean[, c("x2.1", "x2.2", "x3.1")]
+
+write.csv(test, "~/Desktop/GRIT/Kibera/subsetCsv/test.csv", row.names = FALSE)
+
+
+```
+
