@@ -521,20 +521,102 @@ for (var in common_vars) {
 <div id="subset-the-csv-files" class="section level3">
 <h3>subset the csv files</h3>
 <pre class="r"><code>#MENTAL HEALTH CSV
-
-
-
 x9_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x9&quot;)]
 
 cols_to_extract &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x9_cols)
 
-# Subset the data
 mentalHealth &lt;- AlldataClean[, cols_to_extract, with = FALSE] 
 
+#get rid of any rows where there was a NA
 mentalHealth &lt;- mentalHealth[complete.cases(mentalHealth[, ..x9_cols])]
 
+mentalHealth[, (x9_cols) := lapply(.SD, function(x) as.numeric(as.character(x))), .SDcols = x9_cols]
+
+# Create PHQ9 numeric versions
+for (col in x9_cols) {
+  new_col &lt;- paste0(col, &quot;PHQ9&quot;)
+  mentalHealth[[new_col]] &lt;- fifelse(mentalHealth[[col]] == 1, 0,
+                              fifelse(mentalHealth[[col]] == 2, 1,
+                              fifelse(mentalHealth[[col]] == 3, 2,
+                              fifelse(mentalHealth[[col]] == 4, 3, NA_integer_))))
+}
+
+# Identify all columns ending with &quot;PHQ9&quot;
+phq9_cols &lt;- grep(&quot;PHQ9$&quot;, names(mentalHealth), value = TRUE)
+
+# Sum across these columns row-wise
+mentalHealth[, PHQ9Score := rowSums(.SD, na.rm = TRUE), .SDcols = phq9_cols]</code></pre>
+<pre><code>## Warning in `[.data.table`(mentalHealth, , `:=`(PHQ9Score, rowSums(.SD, na.rm =
+## TRUE)), : Invalid .internal.selfref detected and fixed by taking a (shallow)
+## copy of the data.table so that := can add this new column by reference. At an
+## earlier point, this data.table has been copied by R (or was created manually
+## using structure() or similar). Avoid names&lt;- and attr&lt;- which in R currently
+## (and oddly) may copy the whole data.table. Use set* syntax instead to avoid
+## copying: ?set, ?setnames and ?setattr. If this message doesn&#39;t help, please
+## report your use case to the data.table issue tracker so the root cause can be
+## fixed or this message improved.</code></pre>
+<pre class="r"><code>mentalHealth[, PHQ9Level := fcase(
+  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  &quot;None-minimal&quot;,
+  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  &quot;Mild&quot;,
+  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, &quot;Moderate&quot;,
+  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, &quot;Moderately Severe&quot;,
+  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, &quot;Severe&quot;
+)]
+
+mentalHealth[, PHQ9LevelScore := fcase(
+  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  0,
+  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  1,
+  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, 2,
+  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, 3,
+  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, 4
+)]
 
 write.csv(mentalHealth, &quot;~/Desktop/GRIT/Kibera/subsetCsv/mentalHealth.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#GENDER PERCEPTIONS CSV
+
+x8_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x8&quot;)]
+
+cols_to_extract_gender &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x8_cols)
+
+# Subset the data
+genderPercep &lt;- AlldataClean[, cols_to_extract_gender, with = FALSE] 
+
+write.csv(genderPercep, &quot;~/Desktop/GRIT/Kibera/subsetCsv/genderPerceptions.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#DOMESTIC VIOLENCE CSV
+
+x6_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x6&quot;)]
+
+cols_to_extract_dv &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x6_cols)
+
+# Subset the data
+dv &lt;- AlldataClean[, cols_to_extract_dv, with = FALSE] 
+
+write.csv(dv, &quot;~/Desktop/GRIT/Kibera/subsetCsv/domesticViolence.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#ABORTION CSV
+
+cols_to_extract_ab &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.15&quot;, &quot;x3.16&quot;, &quot;x3.17&quot;)
+
+# Subset the data
+abortion &lt;- AlldataClean[, cols_to_extract_ab, with = FALSE] 
+
+abortion &lt;- abortion[!is.na(x3.15)]
+
+
+write.csv(abortion, &quot;~/Desktop/GRIT/Kibera/subsetCsv/abortion.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#PERSONAL SEXUAL HEALTH
+
+cols_to_extract_sex &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.8&quot;, &quot;x3.9&quot;, &quot;x3.10&quot;, &quot;x3.11&quot;, &quot;x3.12&quot;, &quot;x3.13&quot;, &quot;x3.14&quot;, &quot;x3.18&quot;, &quot;x3.19&quot;, &quot;x3.20&quot;)
+
+# Subset the data
+sex &lt;- AlldataClean[, cols_to_extract_sex, with = FALSE] 
+
+
+write.csv(sex, &quot;~/Desktop/GRIT/Kibera/subsetCsv/sex.csv&quot;, row.names = FALSE)
+
+#get rid of weird NAs
+#filtered_sex &lt;- sex[x3.8 != &quot;1&quot; &amp; x3.10 == &quot;1&quot;]
+
+sex &lt;- sex[!sex$x1.2 %in% c(224, 222,28), ]</code></pre>
 </div>
 
 
