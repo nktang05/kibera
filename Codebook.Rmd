@@ -29,6 +29,7 @@ data_labels <- read_csv("~/Desktop/GRIT/Kibera/originalCsv/kibera_values_data.cs
 
 # Step 2: Extract variable labels and drop metadata/header rows
 variable_labels <- as.character(unlist(data_values[1, ]))
+
 data_values <- data_values[-c(1, 2), ]
 data_labels <- data_labels[-c(1, 2), ]
 
@@ -72,10 +73,6 @@ for (col in common_cols) {
 codebook_df <- bind_rows(codebook_list) %>%
   select(Variable, Value, Label)
 
-# Step 6: Apply variable labels (question text) to data_values
-for (i in seq_along(data_values)) {
-  var_label(data_values[[i]]) <- variable_labels[i]
-}
 
 # Step 7: Build nested dictionary for value labels
 label_dict <- codebook_df %>%
@@ -90,6 +87,11 @@ for (var in names(label_dict)) {
     data_values[[var]] <- as.character(data_values[[var]])
     val_labels(data_values[[var]]) <- label_dict[[var]]
   }
+}
+
+# Step 6: Apply variable labels (question text) to data_values
+for (i in seq_along(data_values)) {
+  var_label(data_values[[i]]) <- variable_labels[i]
 }
 
 # Step 9: Save codebook CSV
@@ -112,6 +114,10 @@ codebook_output <- codebook(data_values[, safe_vars])
 
 
 ```
+
+
+
+
 
 ```{r}
 

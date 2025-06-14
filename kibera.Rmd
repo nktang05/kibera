@@ -76,6 +76,8 @@ data <- data[-c(1, 2), ]
 names(data) <- ifelse(grepl("^[0-9]", names(data)),
                       paste0("x", names(data)),
                       names(data))
+#make all blanks NA
+data[data == ""] <- NA
 
 ```
 
@@ -139,7 +141,11 @@ data <- data[!is.na(`x2.2`) & `x2.2` != "", ]
 # delete in age is is NA or an empty string
 data <- data[!is.na(`x2.1`) & `x2.1` != "", ]
 
+# check for ID if NA replace with temp id number
+na_rows <- is.na(data$'x1.2')
 
+# Create a sequence starting at 1000 for just those rows
+data$x1.2[na_rows] <- 1000 + seq_len(sum(na_rows)) - 1
 ```
 
 ### Check for weird conditionals
@@ -171,15 +177,80 @@ data[["x3.9"]][data[["x2.2"]] != 1 & data[["x3.9"]] != ""] <- NA
 
 
 ```{r}
-#query to see duplicate village numbers
-sqldf("SELECT [x1.2], COUNT(*) as count 
+# Get rid of duplicate entries
+#query to see duplicate ID
+sqldf("SELECT [x1.2], COUNT(*) as count
        FROM data 
        GROUP BY [x1.2] 
        HAVING COUNT(*) > 1")
+
+
+sqldf("SELECT *
+       FROM data 
+       WHERE [x1.2] = 30300")
+
+#duplicates are: 202, 205, 207, 208, 209, 210, 211, 265, 270, 271, 456
+
+dupe_ids <- c(202, 205, 207, 208, 209, 210, 211, 265, 270, 271, 456)
+
+# Ensure x1.2 is numeric (if needed)
+data$x1.2 <- as.numeric(data$x1.2)
+
+# Initialize an empty list to track rows to remove
+rows_to_remove <- c()
+
+# Loop through each duplicate ID
+for (id in dupe_ids) {
+  row_indices <- which(data$x1.2 == id)
+  
+  # Only remove if more than one occurrence exists
+  if (length(row_indices) > 1) {
+    # Remove the first duplicate (or any one)
+    rows_to_remove <- c(rows_to_remove, row_indices[1])
+  }
+}
+
+# Remove the selected rows
+data <- data[-rows_to_remove, ]
+
+
+conflict_ids <- c(1, 17, 30, 436, 444, 451, 543, 607)
+
+data$x1.2 <- as.character(data$x1.2)
+
+# Modify one of each duplicate to append "200"
+for (id in conflict_ids) {
+  rows <- which(data$x1.2 == as.character(id))
+  
+  if (length(rows) > 1) {
+    data$x1.2[rows[2]] <- paste0(id, "200")
+  }
+}
+
+# Convert x1.2 back to numeric
+data$x1.2 <- as.numeric(data$x1.2)
+
+conflict_idss <- c(30, 543)
+
+data$x1.2 <- as.character(data$x1.2)
+
+# Modify one of each duplicate to append "200"
+for (id in conflict_idss) {
+  rows <- which(data$x1.2 == as.character(id))
+  
+  if (length(rows) > 1) {
+    data$x1.2[rows[2]] <- paste0(id, "300")
+  }
+}
+
+# Convert x1.2 back to numeric
+data$x1.2 <- as.numeric(data$x1.2)
+
 ```
 
 
 ```{r}
+
 #query checker for if male said they were pregnant
 sqldf("SELECT [x2.2], [x4.8] , [x1.2]
       FROM data 
