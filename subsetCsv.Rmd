@@ -37,6 +37,367 @@ Alllabelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_da
 
 ```
 
+
+### subset the csv files
+```{r}
+#MENTAL HEALTH CSV
+x9_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x9")]
+
+cols_to_extract <- c("x1.2", "x2.1", "x2.2", x9_cols)
+
+mentalHealth <- AlldataClean[, cols_to_extract, with = FALSE] 
+
+#get rid of any rows where there was a NA
+mentalHealth <- mentalHealth[complete.cases(mentalHealth[, ..x9_cols])]
+
+mentalHealth[, (x9_cols) := lapply(.SD, function(x) as.numeric(as.character(x))), .SDcols = x9_cols]
+
+# Create PHQ9 numeric versions
+for (col in x9_cols) {
+  new_col <- paste0(col, "PHQ9")
+  mentalHealth[[new_col]] <- fifelse(mentalHealth[[col]] == 1, 0,
+                              fifelse(mentalHealth[[col]] == 2, 1,
+                              fifelse(mentalHealth[[col]] == 3, 2,
+                              fifelse(mentalHealth[[col]] == 4, 3, NA_integer_))))
+}
+
+# Identify all columns ending with "PHQ9"
+phq9_cols <- grep("PHQ9$", names(mentalHealth), value = TRUE)
+
+# Sum across these columns row-wise
+mentalHealth[, PHQ9Score := rowSums(.SD, na.rm = TRUE), .SDcols = phq9_cols]
+
+mentalHealth[, PHQ9Level := fcase(
+  PHQ9Score >= 0 & PHQ9Score <= 4,  "None-minimal",
+  PHQ9Score >= 5 & PHQ9Score <= 9,  "Mild",
+  PHQ9Score >= 10 & PHQ9Score <= 14, "Moderate",
+  PHQ9Score >= 15 & PHQ9Score <= 19, "Moderately Severe",
+  PHQ9Score >= 20 & PHQ9Score <= 27, "Severe"
+)]
+
+mentalHealth[, PHQ9LevelScore := fcase(
+  PHQ9Score >= 0 & PHQ9Score <= 4,  0,
+  PHQ9Score >= 5 & PHQ9Score <= 9,  1,
+  PHQ9Score >= 10 & PHQ9Score <= 14, 2,
+  PHQ9Score >= 15 & PHQ9Score <= 19, 3,
+  PHQ9Score >= 20 & PHQ9Score <= 27, 4
+)]
+
+write.csv(mentalHealth, "~/Desktop/GRIT/Kibera/subsetCsv/mentalHealth.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+#GENDER PERCEPTIONS CSV
+
+x8_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x8")]
+
+cols_to_extract_gender <- c("x1.2", "x2.1", "x2.2", x8_cols)
+
+# Subset the data
+genderPercep <- AlldataClean[, cols_to_extract_gender, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM genderPercep
+  WHERE [x8.1] is NULL AND [x8.2] is NULL AND [x8.3] is NULL AND [x8.4] is NULL AND [x8.5] is NULL AND [x8.6] is NULL AND [x8.7] is NULL AND [x8.8] is NULL AND [x8.9] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+genderPercep <- genderPercep[ !x1.2 %in% ids_to_delete ]
+
+write.csv(genderPercep, "~/Desktop/GRIT/Kibera/subsetCsv/genderPerceptions.csv", row.names = FALSE)
+```
+
+```{r}
+#DOMESTIC VIOLENCE CSV
+
+x6_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x6")]
+
+cols_to_extract_dv <- c("x1.2", "x2.1", "x2.2", x6_cols)
+
+# Subset the data
+dv <- AlldataClean[, cols_to_extract_dv, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM dv
+  WHERE [x6.1] is NULL AND [x6.2] is NULL AND [x6.3] is NULL AND [x6.4] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+dv <- dv[ !x1.2 %in% ids_to_delete ]
+
+write.csv(dv, "~/Desktop/GRIT/Kibera/subsetCsv/domesticViolence.csv", row.names = FALSE)
+```
+
+```{r}
+#ABORTION CSV
+
+cols_to_extract_ab <- c("x1.2", "x2.1", "x2.2", "x3.15", "x3.16", "x3.17")
+
+# Subset the data
+abortion <- AlldataClean[, cols_to_extract_ab, with = FALSE] 
+
+abortion <- abortion[!is.na(x3.15)]
+
+write.csv(abortion, "~/Desktop/GRIT/Kibera/subsetCsv/abortion.csv", row.names = FALSE)
+```
+
+
+```{r}
+#PERSONAL SEXUAL HEALTH
+
+cols_to_extract_sex <- c("x1.2", "x2.1", "x2.2", "x3.8", "x3.9", "x3.10", "x3.11", "x3.12", "x3.13", "x3.14", "x3.18", "x3.19", "x3.20")
+
+# Subset the data
+sex <- AlldataClean[, cols_to_extract_sex, with = FALSE] 
+
+
+
+
+#get rid of weird NAs
+#filtered_sex <- sex[x3.8 != "1" & x3.10 == "1"]
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM sex
+  WHERE [x3.8] is NULL AND [x3.9] is NULL AND [x3.10] is NULL AND [x3.11] is NULL AND [x3.12] is NULL AND [x3.13] is NULL AND [x3.14] is NULL AND [x3.18] is NULL AND [x3.19] is NULL AND [x3.20] is NULL
+")
+
+print(sql_result)
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+sex <- sex[ !x1.2 %in% ids_to_delete ]
+
+sql_result <- sqldf("
+    SELECT
+      [x1.2]
+    FROM sex
+    WHERE [x3.8] = 1 AND [x3.10] = 1
+  ")
+  
+  print(sql_result)
+  
+  #ids_to_delete <- sql_result[["x1.2"]]
+  
+  #sex <- sex[ !x1.2 %in% ids_to_delete ]
+
+#sex <- sex[!sex$x1.2 %in% c(224, 222,28), ]
+
+write.csv(sex, "~/Desktop/GRIT/Kibera/subsetCsv/sex.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+# PERSONAL PREGNANCY/DELIVERY/CHILDCARE
+
+cols_to_extract_pregnancy <- c("x1.2", "x2.1", "x2.2", "x4.8", "x4.9","x4.10","x4.11","x4.12","x4.13","x4.14","x4.15","x4.16","x4.17","x4.18","x4.19","x4.20","x4.21","x4.22","x5.23","x4.24","x4.25","x4.26","x4.27","x4.28","x4.29","x4.30", "x5.1", "x5.2","x5.3","x5.4","x5.5","x5.6","x5.7","x5.8","x5.9","x5.10","x5.11","x5.12","x5.13","x5.14","x5.15","x5.16")
+
+# Subset the data
+pregnancy <- AlldataClean[, cols_to_extract_pregnancy, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM pregnancy
+  WHERE [x4.8]is NULL
+")
+
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+pregnancy <- pregnancy[ !x1.2 %in% ids_to_delete ]
+
+# Columns to set to NA
+cols_to_nullify <- setdiff(
+  cols_to_extract_pregnancy,
+  c("x1.2", "x2.1", "x2.2", "x4.8")
+)
+
+# Set to NA if x4.8 == 2
+pregnancy[
+  x4.8 == 2,
+  (cols_to_nullify) := lapply(.SD, function(x) NA),
+  .SDcols = cols_to_nullify
+]
+
+write.csv(pregnancy, "~/Desktop/GRIT/Kibera/subsetCsv/pregnancy.csv", row.names = FALSE)
+
+
+```
+
+
+```{r}
+# PARTNER PREGNANCY/DELIVERY/CHILDCARE
+
+cols_to_extract_partnerpregnancy <- c("x1.2", "x2.1", "x2.2", "x4.1", "x4.2","x4.3","x4.4","x4.5","x4.6","x4.14","x4.7")
+
+# Subset the data
+partnerpregnancy <- AlldataClean[, cols_to_extract_partnerpregnancy, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM partnerpregnancy
+  WHERE [x4.1]is NULL AND [x4.2] is NULL AND [x4.3] is NULL AND [x4.4] is NULL AND [x4.5] is NULL AND [x4.6] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+partnerpregnancy <- partnerpregnancy[ !x1.2 %in% ids_to_delete ]
+
+
+write.csv(partnerpregnancy, "~/Desktop/GRIT/Kibera/subsetCsv/partnerpregnancy.csv", row.names = FALSE)
+
+
+
+```
+
+
+
+```{r}
+# MENSTRUAL HYGEINE
+
+cols_to_extract_menstrual <- c("x1.2", "x2.1", "x2.2", "x3.1", "x3.1_1_TEXT", "x3.2", "x3.3", "x3.4", "x3.5", "x3.6", "x3.7")
+
+# Subset the data
+menstrual <- AlldataClean[, cols_to_extract_menstrual, with = FALSE] 
+
+# Remove rows where x3.1 is blank or NA
+menstrual <- menstrual[
+  !(is.na(x3.1) | trimws(x3.1) == "")
+]
+
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM menstrual
+  WHERE [x3.2] is NULL AND [x3.3] is NULL AND [x3.4] is NULL AND [x3.5] is NULL AND [x3.6] is NULL AND [x3.7] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+menstrual <- menstrual[ !x1.2 %in% ids_to_delete ]
+
+menstrual <- menstrual[ !x1.2 %in% c(433, 324) ]
+
+write.csv(menstrual, "~/Desktop/GRIT/Kibera/subsetCsv/menstrual.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+# ACCESS TO EDUCATION
+
+cols_to_extract_education <- c("x1.2", "x2.1", "x2.2", "x2.3", "x2.4", "x2.5", "x2.6")
+
+# Subset the data
+education <- AlldataClean[, cols_to_extract_education, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.4] is NULL AND [x2.6] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+education <- education[ !x1.2 %in% ids_to_delete ]
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.3] is NULL
+")
+
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+education <- education[ !x1.2 %in% ids_to_delete ]
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.4] is NULL and [x2.5] is not NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+education <- education[ !x1.2 %in% ids_to_delete ]
+
+write.csv(education, "~/Desktop/GRIT/Kibera/subsetCsv/education.csv", row.names = FALSE)
+
+
+```
+
+```{r}
+# ACCESS TO SEX EDUCATION
+
+cols_to_extract_sexeducation <- c("x1.2", "x2.1", "x2.2", "x3.6", "x3.12", "x3.13", "x4.4", "x4.16", "x4.21", "x5.14")
+
+# Subset the data
+sexeducation <- AlldataClean[, cols_to_extract_sexeducation, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM sexeducation
+  WHERE [x3.6] is NULL AND [x3.12] is NULL AND [x3.13] is NULL AND [x4.4] is NULL AND [x4.16] is NULL AND [x4.21] is NULL AND [x5.14] is NULL 
+")
+
+print(sql_result)
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+sexeducation <- sexeducation[ !x1.2 %in% ids_to_delete ]
+
+
+write.csv(education, "~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv", row.names = FALSE)
+
+
+```
+
+
+```{r}
+# DEMOGRAPHICS
+
+cols_to_extract_demo <- c("x1.2", "x2.1", "x2.2", "x2.7", "x2.8", "x2.9", "x2.16", "x2.17")
+
+# Subset the data
+demo <- AlldataClean[, cols_to_extract_demo, with = FALSE] 
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM demo
+  WHERE [x2.7] is NULL AND [x2.8] is NULL AND [x2.9] is NULL AND [x2.16] is NULL AND [x2.17] is NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+demo <- demo[ !x1.2 %in% ids_to_delete ]
+
+demo <- demo[ !x1.2 %in% c(243, 473, 1010, 1016) ]
+
+write.csv(demo, "~/Desktop/GRIT/Kibera/subsetCsv/demographics.csv", row.names = FALSE)
+
+
+```
+
+
 ```{r}
 # make var numeric
 numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
@@ -155,124 +516,3 @@ for (var in common_vars) {
 }
 
 ```
-
-
-### subset the csv files
-```{r}
-#MENTAL HEALTH CSV
-x9_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x9")]
-
-cols_to_extract <- c("x1.2", "x2.1", "x2.2", x9_cols)
-
-mentalHealth <- AlldataClean[, cols_to_extract, with = FALSE] 
-
-#get rid of any rows where there was a NA
-mentalHealth <- mentalHealth[complete.cases(mentalHealth[, ..x9_cols])]
-
-mentalHealth[, (x9_cols) := lapply(.SD, function(x) as.numeric(as.character(x))), .SDcols = x9_cols]
-
-# Create PHQ9 numeric versions
-for (col in x9_cols) {
-  new_col <- paste0(col, "PHQ9")
-  mentalHealth[[new_col]] <- fifelse(mentalHealth[[col]] == 1, 0,
-                              fifelse(mentalHealth[[col]] == 2, 1,
-                              fifelse(mentalHealth[[col]] == 3, 2,
-                              fifelse(mentalHealth[[col]] == 4, 3, NA_integer_))))
-}
-
-# Identify all columns ending with "PHQ9"
-phq9_cols <- grep("PHQ9$", names(mentalHealth), value = TRUE)
-
-# Sum across these columns row-wise
-mentalHealth[, PHQ9Score := rowSums(.SD, na.rm = TRUE), .SDcols = phq9_cols]
-
-mentalHealth[, PHQ9Level := fcase(
-  PHQ9Score >= 0 & PHQ9Score <= 4,  "None-minimal",
-  PHQ9Score >= 5 & PHQ9Score <= 9,  "Mild",
-  PHQ9Score >= 10 & PHQ9Score <= 14, "Moderate",
-  PHQ9Score >= 15 & PHQ9Score <= 19, "Moderately Severe",
-  PHQ9Score >= 20 & PHQ9Score <= 27, "Severe"
-)]
-
-mentalHealth[, PHQ9LevelScore := fcase(
-  PHQ9Score >= 0 & PHQ9Score <= 4,  0,
-  PHQ9Score >= 5 & PHQ9Score <= 9,  1,
-  PHQ9Score >= 10 & PHQ9Score <= 14, 2,
-  PHQ9Score >= 15 & PHQ9Score <= 19, 3,
-  PHQ9Score >= 20 & PHQ9Score <= 27, 4
-)]
-
-write.csv(mentalHealth, "~/Desktop/GRIT/Kibera/subsetCsv/mentalHealth.csv", row.names = FALSE)
-
-```
-
-
-```{r}
-#GENDER PERCEPTIONS CSV
-
-x8_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x8")]
-
-cols_to_extract_gender <- c("x1.2", "x2.1", "x2.2", x8_cols)
-
-# Subset the data
-genderPercep <- AlldataClean[, cols_to_extract_gender, with = FALSE] 
-
-write.csv(genderPercep, "~/Desktop/GRIT/Kibera/subsetCsv/genderPerceptions.csv", row.names = FALSE)
-```
-
-```{r}
-#DOMESTIC VIOLENCE CSV
-
-x6_cols <- names(AlldataClean)[startsWith(names(AlldataClean), "x6")]
-
-cols_to_extract_dv <- c("x1.2", "x2.1", "x2.2", x6_cols)
-
-# Subset the data
-dv <- AlldataClean[, cols_to_extract_dv, with = FALSE] 
-
-write.csv(dv, "~/Desktop/GRIT/Kibera/subsetCsv/domesticViolence.csv", row.names = FALSE)
-```
-
-```{r}
-#ABORTION CSV
-
-cols_to_extract_ab <- c("x1.2", "x2.1", "x2.2", "x3.15", "x3.16", "x3.17")
-
-# Subset the data
-abortion <- AlldataClean[, cols_to_extract_ab, with = FALSE] 
-
-abortion <- abortion[!is.na(x3.15)]
-
-
-write.csv(abortion, "~/Desktop/GRIT/Kibera/subsetCsv/abortion.csv", row.names = FALSE)
-```
-
-
-```{r}
-#PERSONAL SEXUAL HEALTH
-
-cols_to_extract_sex <- c("x1.2", "x2.1", "x2.2", "x3.8", "x3.9", "x3.10", "x3.11", "x3.12", "x3.13", "x3.14", "x3.18", "x3.19", "x3.20")
-
-# Subset the data
-sex <- AlldataClean[, cols_to_extract_sex, with = FALSE] 
-
-
-write.csv(sex, "~/Desktop/GRIT/Kibera/subsetCsv/sex.csv", row.names = FALSE)
-
-#get rid of weird NAs
-#filtered_sex <- sex[x3.8 != "1" & x3.10 == "1"]
-
-sex <- sex[!sex$x1.2 %in% c(224, 222,28), ]
-
-
-```
-
-
-
-
-
-
-
-
-
-

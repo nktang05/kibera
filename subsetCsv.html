@@ -362,6 +362,470 @@ setwd(&quot;~/Desktop/GRIT/Kibera&quot;)
 
 AlldataClean &lt;- fread(&quot;~/Desktop/GRIT/Kibera/cleanedCsv/kibera_values_cleaned.csv&quot;, header = TRUE)
 Alllabelled_data &lt;- readRDS(&quot;~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds&quot;)</code></pre>
+<div id="subset-the-csv-files" class="section level3">
+<h3>subset the csv files</h3>
+<pre class="r"><code>#MENTAL HEALTH CSV
+x9_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x9&quot;)]
+
+cols_to_extract &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x9_cols)
+
+mentalHealth &lt;- AlldataClean[, cols_to_extract, with = FALSE] 
+
+#get rid of any rows where there was a NA
+mentalHealth &lt;- mentalHealth[complete.cases(mentalHealth[, ..x9_cols])]
+
+mentalHealth[, (x9_cols) := lapply(.SD, function(x) as.numeric(as.character(x))), .SDcols = x9_cols]
+
+# Create PHQ9 numeric versions
+for (col in x9_cols) {
+  new_col &lt;- paste0(col, &quot;PHQ9&quot;)
+  mentalHealth[[new_col]] &lt;- fifelse(mentalHealth[[col]] == 1, 0,
+                              fifelse(mentalHealth[[col]] == 2, 1,
+                              fifelse(mentalHealth[[col]] == 3, 2,
+                              fifelse(mentalHealth[[col]] == 4, 3, NA_integer_))))
+}
+
+# Identify all columns ending with &quot;PHQ9&quot;
+phq9_cols &lt;- grep(&quot;PHQ9$&quot;, names(mentalHealth), value = TRUE)
+
+# Sum across these columns row-wise
+mentalHealth[, PHQ9Score := rowSums(.SD, na.rm = TRUE), .SDcols = phq9_cols]</code></pre>
+<pre><code>## Warning in `[.data.table`(mentalHealth, , `:=`(PHQ9Score, rowSums(.SD, na.rm =
+## TRUE)), : Invalid .internal.selfref detected and fixed by taking a (shallow)
+## copy of the data.table so that := can add this new column by reference. At an
+## earlier point, this data.table has been copied by R (or was created manually
+## using structure() or similar). Avoid names&lt;- and attr&lt;- which in R currently
+## (and oddly) may copy the whole data.table. Use set* syntax instead to avoid
+## copying: ?set, ?setnames and ?setattr. If this message doesn&#39;t help, please
+## report your use case to the data.table issue tracker so the root cause can be
+## fixed or this message improved.</code></pre>
+<pre class="r"><code>mentalHealth[, PHQ9Level := fcase(
+  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  &quot;None-minimal&quot;,
+  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  &quot;Mild&quot;,
+  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, &quot;Moderate&quot;,
+  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, &quot;Moderately Severe&quot;,
+  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, &quot;Severe&quot;
+)]
+
+mentalHealth[, PHQ9LevelScore := fcase(
+  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  0,
+  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  1,
+  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, 2,
+  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, 3,
+  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, 4
+)]
+
+write.csv(mentalHealth, &quot;~/Desktop/GRIT/Kibera/subsetCsv/mentalHealth.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#GENDER PERCEPTIONS CSV
+
+x8_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x8&quot;)]
+
+cols_to_extract_gender &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x8_cols)
+
+# Subset the data
+genderPercep &lt;- AlldataClean[, cols_to_extract_gender, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM genderPercep
+  WHERE [x8.1] is NULL AND [x8.2] is NULL AND [x8.3] is NULL AND [x8.4] is NULL AND [x8.5] is NULL AND [x8.6] is NULL AND [x8.7] is NULL AND [x8.8] is NULL AND [x8.9] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+genderPercep &lt;- genderPercep[ !x1.2 %in% ids_to_delete ]
+
+write.csv(genderPercep, &quot;~/Desktop/GRIT/Kibera/subsetCsv/genderPerceptions.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#DOMESTIC VIOLENCE CSV
+
+x6_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x6&quot;)]
+
+cols_to_extract_dv &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x6_cols)
+
+# Subset the data
+dv &lt;- AlldataClean[, cols_to_extract_dv, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM dv
+  WHERE [x6.1] is NULL AND [x6.2] is NULL AND [x6.3] is NULL AND [x6.4] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+dv &lt;- dv[ !x1.2 %in% ids_to_delete ]
+
+write.csv(dv, &quot;~/Desktop/GRIT/Kibera/subsetCsv/domesticViolence.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#ABORTION CSV
+
+cols_to_extract_ab &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.15&quot;, &quot;x3.16&quot;, &quot;x3.17&quot;)
+
+# Subset the data
+abortion &lt;- AlldataClean[, cols_to_extract_ab, with = FALSE] 
+
+abortion &lt;- abortion[!is.na(x3.15)]
+
+write.csv(abortion, &quot;~/Desktop/GRIT/Kibera/subsetCsv/abortion.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code>#PERSONAL SEXUAL HEALTH
+
+cols_to_extract_sex &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.8&quot;, &quot;x3.9&quot;, &quot;x3.10&quot;, &quot;x3.11&quot;, &quot;x3.12&quot;, &quot;x3.13&quot;, &quot;x3.14&quot;, &quot;x3.18&quot;, &quot;x3.19&quot;, &quot;x3.20&quot;)
+
+# Subset the data
+sex &lt;- AlldataClean[, cols_to_extract_sex, with = FALSE] 
+
+
+
+
+#get rid of weird NAs
+#filtered_sex &lt;- sex[x3.8 != &quot;1&quot; &amp; x3.10 == &quot;1&quot;]
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM sex
+  WHERE [x3.8] is NULL AND [x3.9] is NULL AND [x3.10] is NULL AND [x3.11] is NULL AND [x3.12] is NULL AND [x3.13] is NULL AND [x3.14] is NULL AND [x3.18] is NULL AND [x3.19] is NULL AND [x3.20] is NULL
+&quot;)
+
+print(sql_result)</code></pre>
+<pre><code>##      x1.2
+## 1     343
+## 2     486
+## 3     108
+## 4     111
+## 5      89
+## 6      91
+## 7     283
+## 8     284
+## 9     285
+## 10    349
+## 11     40
+## 12    223
+## 13    250
+## 14    251
+## 15    244
+## 16    243
+## 17    242
+## 18    525
+## 19   1200
+## 20     26
+## 21    417
+## 22    416
+## 23    419
+## 24   1004
+## 25    418
+## 26    415
+## 27   1007
+## 28   1008
+## 29    406
+## 30    405
+## 31    410
+## 32    407
+## 33    460
+## 34    458
+## 35    461
+## 36    413
+## 37    473
+## 38    472
+## 39     46
+## 40     47
+## 41     50
+## 42    325
+## 43    327
+## 44    329
+## 45    330
+## 46    331
+## 47   1010
+## 48    154
+## 49   1015
+## 50   1016
+## 51    451
+## 52    439
+## 53    355
+## 54    265
+## 55    211
+## 56    209
+## 57    389
+## 58    314
+## 59    449
+## 60    478
+## 61    433
+## 62    441
+## 63 444200</code></pre>
+<pre class="r"><code>ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+sex &lt;- sex[ !x1.2 %in% ids_to_delete ]
+
+sql_result &lt;- sqldf(&quot;
+    SELECT
+      [x1.2]
+    FROM sex
+    WHERE [x3.8] = 1 AND [x3.10] = 1
+  &quot;)
+  
+  print(sql_result)</code></pre>
+<pre><code>##     x1.2
+## 1  30200
+## 2    183
+## 3    524
+## 4    234
+## 5    198
+## 6    129
+## 7    384
+## 8    383
+## 9    393
+## 10   392
+## 11   395
+## 12   467
+## 13   468
+## 14   122
+## 15   187
+## 16  1014
+## 17    16
+## 18   495</code></pre>
+<pre class="r"><code>  #ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+  
+  #sex &lt;- sex[ !x1.2 %in% ids_to_delete ]
+
+#sex &lt;- sex[!sex$x1.2 %in% c(224, 222,28), ]
+
+write.csv(sex, &quot;~/Desktop/GRIT/Kibera/subsetCsv/sex.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># PERSONAL PREGNANCY/DELIVERY/CHILDCARE
+
+cols_to_extract_pregnancy &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x4.8&quot;, &quot;x4.9&quot;,&quot;x4.10&quot;,&quot;x4.11&quot;,&quot;x4.12&quot;,&quot;x4.13&quot;,&quot;x4.14&quot;,&quot;x4.15&quot;,&quot;x4.16&quot;,&quot;x4.17&quot;,&quot;x4.18&quot;,&quot;x4.19&quot;,&quot;x4.20&quot;,&quot;x4.21&quot;,&quot;x4.22&quot;,&quot;x5.23&quot;,&quot;x4.24&quot;,&quot;x4.25&quot;,&quot;x4.26&quot;,&quot;x4.27&quot;,&quot;x4.28&quot;,&quot;x4.29&quot;,&quot;x4.30&quot;, &quot;x5.1&quot;, &quot;x5.2&quot;,&quot;x5.3&quot;,&quot;x5.4&quot;,&quot;x5.5&quot;,&quot;x5.6&quot;,&quot;x5.7&quot;,&quot;x5.8&quot;,&quot;x5.9&quot;,&quot;x5.10&quot;,&quot;x5.11&quot;,&quot;x5.12&quot;,&quot;x5.13&quot;,&quot;x5.14&quot;,&quot;x5.15&quot;,&quot;x5.16&quot;)
+
+# Subset the data
+pregnancy &lt;- AlldataClean[, cols_to_extract_pregnancy, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM pregnancy
+  WHERE [x4.8]is NULL
+&quot;)
+
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+pregnancy &lt;- pregnancy[ !x1.2 %in% ids_to_delete ]
+
+# Columns to set to NA
+cols_to_nullify &lt;- setdiff(
+  cols_to_extract_pregnancy,
+  c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x4.8&quot;)
+)
+
+# Set to NA if x4.8 == 2
+pregnancy[
+  x4.8 == 2,
+  (cols_to_nullify) := lapply(.SD, function(x) NA),
+  .SDcols = cols_to_nullify
+]
+
+write.csv(pregnancy, &quot;~/Desktop/GRIT/Kibera/subsetCsv/pregnancy.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># PARTNER PREGNANCY/DELIVERY/CHILDCARE
+
+cols_to_extract_partnerpregnancy &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x4.1&quot;, &quot;x4.2&quot;,&quot;x4.3&quot;,&quot;x4.4&quot;,&quot;x4.5&quot;,&quot;x4.6&quot;,&quot;x4.14&quot;,&quot;x4.7&quot;)
+
+# Subset the data
+partnerpregnancy &lt;- AlldataClean[, cols_to_extract_partnerpregnancy, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM partnerpregnancy
+  WHERE [x4.1]is NULL AND [x4.2] is NULL AND [x4.3] is NULL AND [x4.4] is NULL AND [x4.5] is NULL AND [x4.6] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+partnerpregnancy &lt;- partnerpregnancy[ !x1.2 %in% ids_to_delete ]
+
+
+write.csv(partnerpregnancy, &quot;~/Desktop/GRIT/Kibera/subsetCsv/partnerpregnancy.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># MENSTRUAL HYGEINE
+
+cols_to_extract_menstrual &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.1&quot;, &quot;x3.1_1_TEXT&quot;, &quot;x3.2&quot;, &quot;x3.3&quot;, &quot;x3.4&quot;, &quot;x3.5&quot;, &quot;x3.6&quot;, &quot;x3.7&quot;)
+
+# Subset the data
+menstrual &lt;- AlldataClean[, cols_to_extract_menstrual, with = FALSE] 
+
+# Remove rows where x3.1 is blank or NA
+menstrual &lt;- menstrual[
+  !(is.na(x3.1) | trimws(x3.1) == &quot;&quot;)
+]
+
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM menstrual
+  WHERE [x3.2] is NULL AND [x3.3] is NULL AND [x3.4] is NULL AND [x3.5] is NULL AND [x3.6] is NULL AND [x3.7] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+menstrual &lt;- menstrual[ !x1.2 %in% ids_to_delete ]
+
+menstrual &lt;- menstrual[ !x1.2 %in% c(433, 324) ]
+
+write.csv(menstrual, &quot;~/Desktop/GRIT/Kibera/subsetCsv/menstrual.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># ACCESS TO EDUCATION
+
+cols_to_extract_education &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x2.3&quot;, &quot;x2.4&quot;, &quot;x2.5&quot;, &quot;x2.6&quot;)
+
+# Subset the data
+education &lt;- AlldataClean[, cols_to_extract_education, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.4] is NULL AND [x2.6] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+education &lt;- education[ !x1.2 %in% ids_to_delete ]
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.3] is NULL
+&quot;)
+
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+education &lt;- education[ !x1.2 %in% ids_to_delete ]
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM education
+  WHERE [x2.4] is NULL and [x2.5] is not NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+education &lt;- education[ !x1.2 %in% ids_to_delete ]
+
+write.csv(education, &quot;~/Desktop/GRIT/Kibera/subsetCsv/education.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># ACCESS TO SEX EDUCATION
+
+cols_to_extract_sexeducation &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.6&quot;, &quot;x3.12&quot;, &quot;x3.13&quot;, &quot;x4.4&quot;, &quot;x4.16&quot;, &quot;x4.21&quot;, &quot;x5.14&quot;)
+
+# Subset the data
+sexeducation &lt;- AlldataClean[, cols_to_extract_sexeducation, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM sexeducation
+  WHERE [x3.6] is NULL AND [x3.12] is NULL AND [x3.13] is NULL AND [x4.4] is NULL AND [x4.16] is NULL AND [x4.21] is NULL AND [x5.14] is NULL 
+&quot;)
+
+print(sql_result)</code></pre>
+<pre><code>##      x1.2
+## 1      30
+## 2     343
+## 3     486
+## 4     108
+## 5     111
+## 6      89
+## 7      91
+## 8     283
+## 9     284
+## 10    285
+## 11    349
+## 12     40
+## 13    223
+## 14    250
+## 15    251
+## 16    244
+## 17    243
+## 18    525
+## 19    234
+## 20   1200
+## 21     26
+## 22    417
+## 23    416
+## 24    419
+## 25   1004
+## 26    418
+## 27    415
+## 28   1007
+## 29   1008
+## 30    549
+## 31    383
+## 32    406
+## 33    405
+## 34    410
+## 35    407
+## 36    460
+## 37    458
+## 38    461
+## 39    413
+## 40    468
+## 41    473
+## 42    472
+## 43    586
+## 44     46
+## 45     47
+## 46     50
+## 47     56
+## 48    325
+## 49    327
+## 50    328
+## 51    329
+## 52    330
+## 53    331
+## 54   1010
+## 55     11
+## 56    154
+## 57   1015
+## 58    451
+## 59    439
+## 60    355
+## 61  17200
+## 62    265
+## 63    209
+## 64    389
+## 65    314
+## 66    449
+## 67    478
+## 68    433
+## 69    441
+## 70 444200</code></pre>
+<pre class="r"><code>ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+sexeducation &lt;- sexeducation[ !x1.2 %in% ids_to_delete ]
+
+
+write.csv(education, &quot;~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># DEMOGRAPHICS
+
+cols_to_extract_demo &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x2.7&quot;, &quot;x2.8&quot;, &quot;x2.9&quot;, &quot;x2.16&quot;, &quot;x2.17&quot;)
+
+# Subset the data
+demo &lt;- AlldataClean[, cols_to_extract_demo, with = FALSE] 
+
+sql_result &lt;- sqldf(&quot;
+  SELECT
+    [x1.2]
+  FROM demo
+  WHERE [x2.7] is NULL AND [x2.8] is NULL AND [x2.9] is NULL AND [x2.16] is NULL AND [x2.17] is NULL
+&quot;)
+
+ids_to_delete &lt;- sql_result[[&quot;x1.2&quot;]]
+
+demo &lt;- demo[ !x1.2 %in% ids_to_delete ]
+
+demo &lt;- demo[ !x1.2 %in% c(243, 473, 1010, 1016) ]
+
+write.csv(demo, &quot;~/Desktop/GRIT/Kibera/subsetCsv/demographics.csv&quot;, row.names = FALSE)</code></pre>
 <pre class="r"><code># make var numeric
 numericVars &lt;- c(&quot;x1.1&quot;, &quot;x1.2&quot;, &quot;x1.3&quot;, &quot;x2.1&quot;, &quot;x3.1_1_TEXT&quot;, &quot;x3.9&quot; )
 for (col in numericVars) {
@@ -518,105 +982,6 @@ for (var in common_vars) {
     val_labels(AlldataClean[[var]]) &lt;- val_labels(Alllabelled_data[[var]])
   }
 }</code></pre>
-<div id="subset-the-csv-files" class="section level3">
-<h3>subset the csv files</h3>
-<pre class="r"><code>#MENTAL HEALTH CSV
-x9_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x9&quot;)]
-
-cols_to_extract &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x9_cols)
-
-mentalHealth &lt;- AlldataClean[, cols_to_extract, with = FALSE] 
-
-#get rid of any rows where there was a NA
-mentalHealth &lt;- mentalHealth[complete.cases(mentalHealth[, ..x9_cols])]
-
-mentalHealth[, (x9_cols) := lapply(.SD, function(x) as.numeric(as.character(x))), .SDcols = x9_cols]
-
-# Create PHQ9 numeric versions
-for (col in x9_cols) {
-  new_col &lt;- paste0(col, &quot;PHQ9&quot;)
-  mentalHealth[[new_col]] &lt;- fifelse(mentalHealth[[col]] == 1, 0,
-                              fifelse(mentalHealth[[col]] == 2, 1,
-                              fifelse(mentalHealth[[col]] == 3, 2,
-                              fifelse(mentalHealth[[col]] == 4, 3, NA_integer_))))
-}
-
-# Identify all columns ending with &quot;PHQ9&quot;
-phq9_cols &lt;- grep(&quot;PHQ9$&quot;, names(mentalHealth), value = TRUE)
-
-# Sum across these columns row-wise
-mentalHealth[, PHQ9Score := rowSums(.SD, na.rm = TRUE), .SDcols = phq9_cols]</code></pre>
-<pre><code>## Warning in `[.data.table`(mentalHealth, , `:=`(PHQ9Score, rowSums(.SD, na.rm =
-## TRUE)), : Invalid .internal.selfref detected and fixed by taking a (shallow)
-## copy of the data.table so that := can add this new column by reference. At an
-## earlier point, this data.table has been copied by R (or was created manually
-## using structure() or similar). Avoid names&lt;- and attr&lt;- which in R currently
-## (and oddly) may copy the whole data.table. Use set* syntax instead to avoid
-## copying: ?set, ?setnames and ?setattr. If this message doesn&#39;t help, please
-## report your use case to the data.table issue tracker so the root cause can be
-## fixed or this message improved.</code></pre>
-<pre class="r"><code>mentalHealth[, PHQ9Level := fcase(
-  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  &quot;None-minimal&quot;,
-  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  &quot;Mild&quot;,
-  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, &quot;Moderate&quot;,
-  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, &quot;Moderately Severe&quot;,
-  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, &quot;Severe&quot;
-)]
-
-mentalHealth[, PHQ9LevelScore := fcase(
-  PHQ9Score &gt;= 0 &amp; PHQ9Score &lt;= 4,  0,
-  PHQ9Score &gt;= 5 &amp; PHQ9Score &lt;= 9,  1,
-  PHQ9Score &gt;= 10 &amp; PHQ9Score &lt;= 14, 2,
-  PHQ9Score &gt;= 15 &amp; PHQ9Score &lt;= 19, 3,
-  PHQ9Score &gt;= 20 &amp; PHQ9Score &lt;= 27, 4
-)]
-
-write.csv(mentalHealth, &quot;~/Desktop/GRIT/Kibera/subsetCsv/mentalHealth.csv&quot;, row.names = FALSE)</code></pre>
-<pre class="r"><code>#GENDER PERCEPTIONS CSV
-
-x8_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x8&quot;)]
-
-cols_to_extract_gender &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x8_cols)
-
-# Subset the data
-genderPercep &lt;- AlldataClean[, cols_to_extract_gender, with = FALSE] 
-
-write.csv(genderPercep, &quot;~/Desktop/GRIT/Kibera/subsetCsv/genderPerceptions.csv&quot;, row.names = FALSE)</code></pre>
-<pre class="r"><code>#DOMESTIC VIOLENCE CSV
-
-x6_cols &lt;- names(AlldataClean)[startsWith(names(AlldataClean), &quot;x6&quot;)]
-
-cols_to_extract_dv &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, x6_cols)
-
-# Subset the data
-dv &lt;- AlldataClean[, cols_to_extract_dv, with = FALSE] 
-
-write.csv(dv, &quot;~/Desktop/GRIT/Kibera/subsetCsv/domesticViolence.csv&quot;, row.names = FALSE)</code></pre>
-<pre class="r"><code>#ABORTION CSV
-
-cols_to_extract_ab &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.15&quot;, &quot;x3.16&quot;, &quot;x3.17&quot;)
-
-# Subset the data
-abortion &lt;- AlldataClean[, cols_to_extract_ab, with = FALSE] 
-
-abortion &lt;- abortion[!is.na(x3.15)]
-
-
-write.csv(abortion, &quot;~/Desktop/GRIT/Kibera/subsetCsv/abortion.csv&quot;, row.names = FALSE)</code></pre>
-<pre class="r"><code>#PERSONAL SEXUAL HEALTH
-
-cols_to_extract_sex &lt;- c(&quot;x1.2&quot;, &quot;x2.1&quot;, &quot;x2.2&quot;, &quot;x3.8&quot;, &quot;x3.9&quot;, &quot;x3.10&quot;, &quot;x3.11&quot;, &quot;x3.12&quot;, &quot;x3.13&quot;, &quot;x3.14&quot;, &quot;x3.18&quot;, &quot;x3.19&quot;, &quot;x3.20&quot;)
-
-# Subset the data
-sex &lt;- AlldataClean[, cols_to_extract_sex, with = FALSE] 
-
-
-write.csv(sex, &quot;~/Desktop/GRIT/Kibera/subsetCsv/sex.csv&quot;, row.names = FALSE)
-
-#get rid of weird NAs
-#filtered_sex &lt;- sex[x3.8 != &quot;1&quot; &amp; x3.10 == &quot;1&quot;]
-
-sex &lt;- sex[!sex$x1.2 %in% c(224, 222,28), ]</code></pre>
 </div>
 
 
