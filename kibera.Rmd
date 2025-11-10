@@ -35,6 +35,7 @@ library(labelled)
 setwd("~/Desktop/GRIT/Kibera")
 data <- fread("~/Desktop/GRIT/Kibera/originalCsv/kibera_values_data.csv", header = TRUE)
 
+
 ```
 
 

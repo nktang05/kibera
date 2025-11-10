@@ -1,0 +1,251 @@
+---
+title: "Kibera User Interface"
+author: "Nicole Tang"
+date: "2025"
+output: html_document
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+library(shiny)
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(DT)
+library(stringr)
+
+# Path to your SQLite DB
+db_path <- "~/Desktop/GRIT/Kibera/csv4db/kibera_survey.sqlite"
+
+# Connect
+con <- dbConnect(SQLite(), db_path)
+
+# List columns from master table
+master_columns <- dbListFields(con, "master")
+
+
+```
+
+```{r, echo=FALSE}
+
+fluidPage(
+
+    # Codebook link
+    tags$div(
+        style = "margin-bottom: 15px;",
+        tags$a(
+            href = "https://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261",
+            class = "btn btn-primary",
+            target = "_blank",
+            "Kibera Codebook"
+        )
+    ),
+
+    titlePanel("Kibera Survey Query Tool"),
+
+    sidebarLayout(
+
+        sidebarPanel(
+            h4("Choose Columns for Analysis"),
+
+            #selectInput("value_col", "Column to Summarize:", master_columns),
+            selectInput("group_col", "Group By:", master_columns),
+            actionButton("run_query", "Run Query"),   # ✅ FIXED — added comma
+
+            br(), br(),
+            downloadButton("download_grouped", "Download Grouped Table as CSV"),
+
+            hr(),
+
+            checkboxInput(
+                "enable_pivot",
+                "Enable Pivot Table for Custom Query",
+                value = FALSE
+            ),
+
+            uiOutput("pivot_selectors_ui")
+        ),
+
+        mainPanel(
+
+            h3("Query Results (Long Table)"),
+            DTOutput("grouped_table"),
+
+            hr(),
+
+            h3("Custom SQL Query"),
+            p("Use this section to run more complex queries directly on the Kibera database."),
+
+            textAreaInput(
+                "custom_sql",
+                "Enter SQL Query:",
+                height = "150px",
+                width = "100%",
+                value = "SELECT * FROM master LIMIT 10;"
+            ),
+
+            actionButton("run_custom", "Run Custom Query", class = "btn-success"),
+
+            br(), br(),
+
+            downloadButton("download_custom", "Download Custom Query as CSV"),
+
+            br(), br(),
+
+            DTOutput("custom_results"),
+
+            hr(),
+
+            h3("Pivot Table From Custom Query"),
+            DTOutput("pivot_custom_table"),
+            br(),
+            downloadButton("download_pivot", "Download Pivot Table as CSV")
+        )
+    )
+)
+
+
+```
+
+
+
+```
+
+
+
+```{r, echo=FALSE}
+
+
+
+observeEvent(input$run_query, {
+
+    req(input$group_col)
+
+    group_col <- input$group_col
+
+    sql <- paste0(
+        "SELECT ",
+        group_col, " AS group_value, ",
+        "COUNT(*) AS count ",
+        "FROM master ",
+        "GROUP BY ", group_col, ";"
+    )
+
+    grouped <- dbGetQuery(con, sql)
+
+    output$grouped_table <- renderDT({
+        datatable(grouped, rownames = FALSE)
+    })
+
+    output$download_grouped <- downloadHandler(
+        filename = function() paste0("grouped_results_", Sys.Date(), ".csv"),
+        content = function(file)
+            write.csv(grouped, file, row.names = FALSE)
+    )
+})
+
+
+
+custom_results_reactive <- reactiveVal(NULL)
+
+observeEvent(input$run_custom, {
+
+    tryCatch({
+
+        res <- dbGetQuery(con, input$custom_sql)
+        custom_results_reactive(res)
+
+        output$custom_results <- renderDT({
+            datatable(res, rownames = FALSE)
+        })
+
+    }, error = function(e) {
+
+        output$custom_results <- renderDT({
+            datatable(data.frame(Error = e$message), rownames = FALSE)
+        })
+
+    })
+})
+
+
+# ✅ Download custom SQL results
+output$download_custom <- downloadHandler(
+    filename = function() paste0("custom_query_results_", Sys.Date(), ".csv"),
+    content = function(file) {
+        df <- custom_results_reactive()
+        if (!is.null(df)) write.csv(df, file, row.names = FALSE)
+    }
+)
+
+
+
+
+output$pivot_selectors_ui <- renderUI({
+
+    req(input$enable_pivot)
+    req(custom_results_reactive())
+
+    cols <- names(custom_results_reactive())
+
+    tagList(
+        selectInput("pivot_row", "Pivot Row:", choices = cols),
+        selectInput("pivot_col", "Pivot Column:", choices = cols),
+        actionButton("run_pivot", "Generate Pivot Table", class = "btn-info"),
+        br(), br()
+    )
+})
+
+
+pivot_data_reactive <- reactiveVal(NULL)
+
+
+observeEvent(input$run_pivot, {
+
+    req(custom_results_reactive())
+
+    df <- custom_results_reactive()
+    df <- mutate_all(df, as.character)
+
+    # ✅ If SQL query included a 'count' column, expand back to row-level
+    if ("count" %in% names(df)) {
+        df <- tidyr::uncount(df, weights = as.integer(df$count))
+    }
+
+    # ✅ Always compute counts fresh for pivot
+    pivot <- df |>
+        group_by(.data[[input$pivot_row]], .data[[input$pivot_col]]) |>
+        summarise(n = n(), .groups = "drop") |>
+        tidyr::pivot_wider(
+            names_from = .data[[input$pivot_col]],
+            values_from = n,
+            values_fill = list(n = 0)
+        )
+
+    pivot$Total <- rowSums(pivot[, -1], na.rm = TRUE)
+    total_row <- c("Total", colSums(pivot[, -1], na.rm = TRUE))
+    pivot <- rbind(pivot, total_row)
+
+    colnames(pivot)[1] <- input$pivot_row
+
+    pivot_data_reactive(pivot)
+
+    output$pivot_custom_table <- renderDT({
+        datatable(pivot, rownames = FALSE)
+    })
+})
+
+
+
+# ✅ Download pivot table
+output$download_pivot <- downloadHandler(
+    filename = function() paste0("pivot_table_", Sys.Date(), ".csv"),
+    content = function(file)
+        write.csv(pivot_data_reactive(), file, row.names = FALSE)
+)
+
+
+```
+
+

@@ -24,6 +24,103 @@ library(janitor)
 ```
 
 
+##Demographics
+```{r}
+demo <- fread("~/Desktop/GRIT/Kibera/subsetCsv/demographics.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
+```
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  demo[[col]] <- as.numeric(as.character(demo[[col]]))
+}
+
+# make var date
+demo$x1.4 <- as.Date(demo$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  demo[[col]] <- as.character(demo[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(demo)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  demo[[col]] <- as.character(demo[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(demo), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(demo[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(demo[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(demo[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+unique(demo[["x2.2"]])
+
+```
+
+```{r}
+
+demo$x2.2_factor <- to_factor(demo$x2.2, levels = "label")
+demo$x2.7_factor <- to_factor(demo$x2.7, levels = "label")
+demo$x2.8_factor  <- to_factor(demo$x2.8, levels = "label")
+demo$x2.9_factor <- to_factor(demo$x2.9, levels = "label")
+demo$x2.16_factor <- to_factor(demo$x2.16, levels = "label")
+
+demo$x2.17_factor  <- to_factor(demo$x2.17, levels = "label")
+
+
+sql_result <- sqldf("
+  SELECT
+    [x2.7_factor],
+    COUNT(*) AS count
+  FROM demo
+  GROUP BY [x2.7_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, dv as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x2.7_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
 ## Mental Health
 ```{r}
 
@@ -117,6 +214,39 @@ print(pivot_table_totals)
 ```
 
 
+```{r}
+mentalHealth$x2.2_factor <- to_factor(mentalHealth$x2.2, levels = "label")
+demo$x1.1_factor <- to_factor(demo$x1.1, levels = "label")
+
+sql_result <- sqldf("
+  SELECT
+    d.[x1.1],
+    m.[PHQ9Level],
+    COUNT(*) AS count
+  FROM mentalHealth AS m
+  JOIN demo AS d
+    ON m.[x1.2] = d.[x1.2]
+  GROUP BY d.[x1.1], m.[PHQ9Level]
+  ORDER BY d.[x1.1], m.[PHQ9Level]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, dv as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = PHQ9Level,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+
+
+```
+
 
 ## Gender Perceptions
 ```{r}
@@ -188,11 +318,12 @@ gender$x8.2_factor <- to_factor(gender$x8.2, levels = "label")
 gender$x8.3_factor <- to_factor(gender$x8.3, levels = "label")
 gender$x8.4_factor <- to_factor(gender$x8.4, levels = "label")
 gender$x8.5_factor <- to_factor(gender$x8.5, levels = "label")
+
 gender$x8.6_factor <- to_factor(gender$x8.6, levels = "label")
 gender$x8.7_factor <- to_factor(gender$x8.7, levels = "label")
 gender$x8.8_factor <- to_factor(gender$x8.8, levels = "label")
 gender$x8.9_factor <- to_factor(gender$x8.9, levels = "label")
-gender$x2.2_factor <- to_factor(mentalHealth$x2.2, levels = "label")
+gender$x2.2_factor <- to_factor(gender$x2.2, levels = "label")
 ```
 
 ```{r}
@@ -324,6 +455,7 @@ pivot_table_totals <- pivot_table %>%
 # Step 3: View the table
 print(pivot_table_totals)
 ```
+
 
 ```{r}
 sql_result <- sqldf("
@@ -524,6 +656,35 @@ pivot_table_totals <- pivot_table %>%
 # Step 3: View the table
 print(pivot_table_totals)
 ```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x6.1_factor],
+    COUNT(*) AS count
+  FROM dv
+  GROUP BY [x2.1], [x6.1_factor]
+  ORDER BY [x2.1], [x6.1_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x6.1_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+
 
 ```{r}
 sql_result <- sqldf("
@@ -1099,28 +1260,870 @@ pivot_table_totals <- pivot_table %>%
 # Step 3: View the table
 print(pivot_table_totals)
 ```
+## Pregnancy
+```{r}
+pregnancy <- fread("~/Desktop/GRIT/Kibera/subsetCsv/pregnancy.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
+```
+
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  pregnancy[[col]] <- as.numeric(as.character(pregnancy[[col]]))
+}
+
+# make var date
+pregnancy$x1.4 <- as.Date(pregnancy$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  pregnancy[[col]] <- as.character(pregnancy[[col]])
+}
 
 
-## Subset domestic violence and mental health together
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
 
-When you did not want them to, has someone ever... x mental health
+
+allVars <- names(pregnancy)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  pregnancy[[col]] <- as.character(pregnancy[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(pregnancy), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(pregnancy[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(pregnancy[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(pregnancy[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+unique(pregnancy[["x2.2"]])
+unique(pregnancy[["x4.10"]])
+
+```
+
+```{r}
+pregnancy$x4.8_factor <- to_factor(pregnancy$x4.8, levels = "label")
+pregnancy$x4.16_factor <- to_factor(pregnancy$x4.16, levels = "label")
+pregnancy$x4.17_factor <- to_factor(pregnancy$x4.17, levels = "label")
+pregnancy$x4.20_factor <- to_factor(pregnancy$x4.20, levels = "label")
+pregnancy$x4.22_factor <- to_factor(pregnancy$x4.22, levels = "label")
+pregnancy$x2.2_factor <- to_factor(pregnancy$x2.2, levels = "label")
+pregnancy$x6.2_factor <- to_factor(pregnancy$x6.2, levels = "label")
+
+pregnancy$x5.1_factor <- to_factor(pregnancy$x5.1, levels = "label")
+pregnancy$x5.23_factor <- to_factor(pregnancy$x5.23, levels = "label")
+
+
+```
+
+
 ```{r}
 sql_result <- sqldf("
   SELECT
-    m.[PHQ9Level],
-    d.[x6.2_factor],
+    [x2.1],
+    [x4.16_factor],
     COUNT(*) AS count
-  FROM dv AS d
-    JOIN mentalHealth AS m
-    ON d.[x1.2] = m.[x1.2]
-  GROUP BY m.[PHQ9Level], d.[x6.2_factor]
-  ORDER BY m.[PHQ9Level], d.[x6.2_factor]
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x4.16_factor]
+  ORDER BY [x2.1], [x4.16_factor]
 ")
 
 # Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
 pivot_table <- sql_result %>%
   pivot_wider(
-    names_from = x6.2_factor,
+    names_from = x4.16_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x4.17_factor],
+    COUNT(*) AS count
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x4.17_factor]
+  ORDER BY [x2.1], [x4.17_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.17_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x4.20_factor],
+    COUNT(*) AS count
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x4.20_factor]
+  ORDER BY [x2.1], [x4.20_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.20_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x4.22_factor],
+    COUNT(*) AS count
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x4.22_factor]
+  ORDER BY [x2.1], [x4.22_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.22_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+pregnancy$x5.1_factor <- to_factor(pregnancy$x5.1, levels = "label")
+pregnancy$x5.23_factor <- to_factor(pregnancy$x5.23, levels = "label")
+
+```{r}
+
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x5.1_factor],
+    COUNT(*) AS count
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x5.1_factor]
+  ORDER BY [x2.1], [x5.1_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x5.1_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x5.23_factor],
+    COUNT(*) AS count
+  FROM pregnancy
+  WHERE [x4.8] = 1
+  GROUP BY [x2.1], [x5.23_factor]
+  ORDER BY [x2.1], [x5.23_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x5.23_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+
+
+
+## Menstrual hygeine
+```{r}
+menstrual <- fread("~/Desktop/GRIT/Kibera/subsetCsv/menstrual.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
+```
+
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  menstrual[[col]] <- as.numeric(as.character(menstrual[[col]]))
+}
+
+# make var date
+menstrual$x1.4 <- as.Date(menstrual$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  menstrual[[col]] <- as.character(menstrual[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(menstrual)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  menstrual[[col]] <- as.character(menstrual[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(menstrual), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(menstrual[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(menstrual[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(menstrual[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+unique(menstrual[["x2.2"]])
+unique(menstrual[["x4.10"]])
+
+```
+
+```{r}
+menstrual$x3.1_factor <- to_factor(menstrual$x3.1, levels = "label")
+menstrual$x3.2_factor <- to_factor(menstrual$x3.2, levels = "label")
+menstrual$x3.3_factor <- to_factor(menstrual$x3.3, levels = "label")
+menstrual$x3.4_factor <- to_factor(menstrual$x3.4, levels = "label")
+menstrual$x3.5_factor <- to_factor(menstrual$x3.5, levels = "label")
+menstrual$x3.6_factor <- to_factor(menstrual$x3.6, levels = "label")
+menstrual$x3.7_factor <- to_factor(menstrual$x3.7, levels = "label")
+menstrual$x2.2_factor <- to_factor(menstrual$x2.2, levels = "label")
+```
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.1_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.1_factor]
+  ORDER BY [x2.1], [x3.1_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.1_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+```{r}
+
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.2_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.2_factor]
+  ORDER BY [x2.1], [x3.2_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.2_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+```{r}
+
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.3_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.3_factor]
+  ORDER BY [x2.1], [x3.3_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.3_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.4_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.4_factor]
+  ORDER BY [x2.1], [x3.4_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.4_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.5_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.5_factor]
+  ORDER BY [x2.1], [x3.5_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.5_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.6_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.6_factor]
+  ORDER BY [x2.1], [x3.6_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.6_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.7_factor],
+    COUNT(*) AS count
+  FROM menstrual
+  GROUP BY [x2.1], [x3.7_factor]
+  ORDER BY [x2.1], [x3.7_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.7_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+## EDUCATION 
+```{r}
+education <- fread("~/Desktop/GRIT/Kibera/subsetCsv/education.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
+```
+
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  education[[col]] <- as.numeric(as.character(education[[col]]))
+}
+
+# make var date
+education$x1.4 <- as.Date(education$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  education[[col]] <- as.character(education[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(education)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  education[[col]] <- as.character(education[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(education), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(education[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(education[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(education[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+unique(education[["x2.2"]])
+
+```
+
+
+```{r}
+
+education$x2.2_factor <- to_factor(education$x2.2, levels = "label")
+```
+
+
+
+
+
+
+
+
+
+
+
+## SEX EDUCATION
+```{r}
+sexEd <- fread("~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv", header = TRUE)
+labelled_data <- readRDS("~/Desktop/GRIT/Kibera/codebook/codebook_labelled_data.rds")
+```
+
+```{r}
+# make var numeric
+numericVars <- c("x1.1", "x1.2", "x1.3", "x2.1", "x3.1_1_TEXT", "x3.9" )
+for (col in numericVars) {
+  sexEd[[col]] <- as.numeric(as.character(sexEd[[col]]))
+}
+
+# make var date
+sexEd$x1.4 <- as.Date(sexEd$x1.4, format = "%d/%m/%Y")
+
+# make var string
+charVars <- c("x2.5_5_TEXT" , "x2.7_6_TEXT", "x2.10_8_TEXT", "x2.12_10_TEXT", "x2.14_5_TEXT", "x2.16_7_TEXT", "x2.21_9_TEXT", "x3.3_7_TEXT", "x3.13_8_TEXT", 
+              "x3.14_7_TEXT", "x3.17_7_TEXT", "x4.10_1_TEXT", "x7.9_6_TEXT") 
+
+for (col in charVars) {
+  sexEd[[col]] <- as.character(sexEd[[col]])
+}
+
+
+#for (col in factorVars) {
+  #data[[col]] <- as.factor(data[[col]])
+#}
+
+
+allVars <- names(sexEd)
+excludeVars <- c(numericVars, charVars, "x1.4")
+factorVars <- setdiff(allVars, excludeVars)
+
+
+for (col in factorVars) {
+  sexEd[[col]] <- as.character(sexEd[[col]])
+}
+```
+
+```{r}
+# Get overlapping variables
+common_vars <- intersect(names(sexEd), names(labelled_data))
+
+print(common_vars)
+
+# Identify non-numeric variables
+non_numeric_vars <- common_vars[
+  sapply(common_vars, function(var) {
+    !is.numeric(sexEd[[var]]) && !is.numeric(labelled_data[[var]])
+  })
+]
+
+# Apply labels to non-numeric overlapping variables only
+for (var in non_numeric_vars) {
+  var_label(sexEd[[var]]) <- var_label(labelled_data[[var]])
+  val_labels(sexEd[[var]]) <- val_labels(labelled_data[[var]])
+}
+
+unique(sexEd[["x2.2"]])
+unique(sexEd[["x4.10"]])
+
+```
+
+
+
+```{r}
+sexEd$x3.12_factor <- to_factor(sexEd$x3.12, levels = "label")
+sexEd$x4.16_factor <- to_factor(sexEd$x4.16, levels = "label")
+sexEd$x5.14_factor <- to_factor(sexEd$x5.14, levels = "label")
+sexEd$x2.2_factor <- to_factor(sexEd$x2.2, levels = "label")
+```
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.1],
+    [x3.12_factor],
+    COUNT(*) AS count
+  FROM sexEd
+  GROUP BY [x2.1], [x3.12_factor]
+  ORDER BY [x2.1], [x3.12_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.12_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+```{r}
+sql_result <- sqldf("
+  SELECT
+    [x2.2_factor],
+    [x3.12_factor],
+    COUNT(*) AS count
+  FROM sexEd
+  GROUP BY [x2.2_factor], [x3.12_factor]
+  ORDER BY [x2.2_factor], [x3.12_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.12_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    s.[x2.1],
+    s.[x4.16_factor],
+    COUNT(*) AS count
+  FROM sexEd AS s
+  JOIN pregnancy AS p
+  ON p.[x1.2] = s.[x1.2]
+  WHERE p.[x4.8] = 1
+  GROUP BY s.[x2.1], s.[x4.16_factor]
+  ORDER BY s.[x2.1], s.[x4.16_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.16_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    s.[x2.1],
+    s.[x5.14_factor],
+    COUNT(*) AS count
+  FROM sexEd AS s
+  JOIN pregnancy AS p
+  ON p.[x1.2] = s.[x1.2]
+  WHERE p.[x4.8] = 1
+  GROUP BY s.[x2.1], s.[x5.14_factor]
+  ORDER BY s.[x2.1], s.[x5.14_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x5.14_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+## SUBSET SEX ED AND PREGNANCY
+
+```{r}
+
+x3.12_factor
+
+sql_result <- sqldf("
+  SELECT
+    p.[x4.8_factor],
+    s.[x3.12_factor],
+    COUNT(*) AS count
+  FROM sexEd AS s
+  JOIN pregnancy AS p
+  ON p.[x1.2] = s.[x1.2]
+  WHERE p.[x4.8] = 1
+  GROUP BY p.[x4.8_factor], s.[x3.12_factor]
+  ORDER BY p.[x4.8_factor], s.[x3.12_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.12_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+
+
+
+
+```
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    p.[x4.22_factor],
+    s.[x3.12_factor],
+    COUNT(*) AS count
+  FROM sexEd AS s
+  JOIN pregnancy AS p
+  ON p.[x1.2] = s.[x1.2]
+  WHERE p.[x4.8] = 1
+  GROUP BY p.[x4.22_factor], s.[x3.12_factor]
+  ORDER BY p.[x4.22_factor], s.[x3.12_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.12_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+## SUBSET SEX ED AND SEXUAL ACTIVITY
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    s.[x3.8_factor],
+    e.[x3.12_factor],
+    COUNT(*) AS count
+  FROM sexEd AS e
+  JOIN sexual AS s
+  ON e.[x1.2] = s.[x1.2]
+  GROUP BY s.[x3.8_factor], e.[x3.12_factor]
+  ORDER BY s.[x3.8_factor], e.[x3.12_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x3.12_factor,
     values_from = count,
     values_fill = list(count = 0)
   )
@@ -1145,7 +2148,264 @@ print(pivot_table_totals)
 
 
 
+## Subset domestic violence and mental health together
 
+When you did not want them to, has someone ever... x mental health
+```{r}
+sql_result <- sqldf("
+  SELECT
+    m.[PHQ9Level],
+    p.[x6.2_factor],
+    COUNT(*) AS count
+  FROM pregnancy AS p
+    JOIN mentalHealth AS m
+    ON p.[x1.2] = m.[x1.2]
+  GROUP BY m.[PHQ9Level], p.[x6.2_factor]
+  ORDER BY m.[PHQ9Level], p.[x6.2_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x6.2_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+
+
+## Subset pregnancy and mental health together
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    m.[PHQ9Level],
+    d.[x4.8_factor],
+    COUNT(*) AS count
+  FROM pregnancy AS d
+    JOIN mentalHealth AS m
+    ON d.[x1.2] = m.[x1.2]
+  GROUP BY m.[PHQ9Level], d.[x4.8_factor]
+  ORDER BY m.[PHQ9Level], d.[x4.8_factor]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.8_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+
+##by Location
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    m.[PHQ9Level],
+    p.[x4.8_factor],
+    d.[x1.1],
+    COUNT(*) AS count
+  FROM pregnancy AS p
+    JOIN mentalHealth AS m
+      ON p.[x1.2] = m.[x1.2]
+    JOIN demo AS d
+      ON d.[x1.2] = m.[x1.2]
+  GROUP BY m.[PHQ9Level], p.[x4.8_factor], d.[x1.1]
+  ORDER BY d.[x1.1]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.8_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+##by age
+
+
+```{r}
+sql_result <- sqldf("
+  SELECT
+    m.[PHQ9Level],
+    p.[x4.8_factor],
+    d.[x2.1],
+    COUNT(*) AS count
+  FROM pregnancy AS p
+    JOIN mentalHealth AS m
+      ON p.[x1.2] = m.[x1.2]
+    JOIN demo AS d
+      ON d.[x1.2] = m.[x1.2]
+  GROUP BY m.[PHQ9Level], p.[x4.8_factor], d.[x2.1]
+  ORDER BY d.[x2.1]
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x4.8_factor,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+```
+
+```{r}
+
+
+sql_result <- sqldf("
+  SELECT
+    d.[x1.1],
+    COUNT(*) AS count
+  FROM pregnancy as p
+  JOIN demo AS d
+      ON d.[x1.2] = p.[x1.2]
+  WHERE p.[x4.8] = 1
+  GROUP BY d.[x1.1]
+
+")
+
+# Step 2: Pivot to make a wide table (Age as rows, Gender as columns)
+pivot_table <- sql_result %>%
+  pivot_wider(
+    names_from = x1.1,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+pivot_table_totals <- pivot_table %>%
+  adorn_totals(where = c("row", "col"), na.rm = TRUE)
+
+# Step 3: View the table
+print(pivot_table_totals)
+
+
+```
+```{r}
+library(sqldf)
+library(dplyr)
+library(tidyr)
+
+# 1. SQL query
+sql_result <- sqldf("
+  SELECT
+    d.[x1.1] AS group_var,
+    p.[x4.8] AS outcome_var,
+    COUNT(*) AS count
+  FROM pregnancy AS p
+  JOIN demo AS d
+    ON d.[x1.2] = p.[x1.2]
+  GROUP BY d.[x1.1], p.[x4.8]
+")
+
+# 2. Convert to character to avoid haven_labelled issues
+sql_result_clean <- sql_result %>%
+  mutate(
+    group_var   = as.character(group_var),
+    outcome_var = as.character(outcome_var)
+  )
+
+# 3. Pivot to wide format
+pivot_table <- sql_result_clean %>%
+  pivot_wider(
+    names_from  = outcome_var,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+# 4. Add a total row and total column
+pivot_table_totals <- pivot_table %>%
+  mutate(RowTotal = rowSums(across(where(is.numeric)))) %>%  # add total column
+  bind_rows(                                                # add total row
+    summarise(., across(where(is.numeric), sum)) %>%
+      mutate(group_var = "TOTAL", RowTotal = sum(RowTotal))
+  )
+
+# 5. Print final table
+print(pivot_table_totals)
+
+
+```
+
+```{r}
+library(sqldf)
+library(dplyr)
+library(tidyr)
+
+# 1. Get counts for each combo of x2.1 and x4.22_factor
+sql_result <- sqldf("
+  SELECT
+    [x2.1]          AS group_var,
+    [x4.22_factor]  AS outcome_var,
+    COUNT(*)        AS count
+  FROM pregnancy
+  GROUP BY [x2.1], [x4.22_factor]
+  ORDER BY [x2.1], [x4.22_factor]
+")
+
+# 2. Force to plain character (fixes haven_labelled issues)
+sql_result_clean <- sql_result %>%
+  mutate(
+    group_var   = as.character(group_var),
+    outcome_var = as.character(outcome_var)
+  )
+
+# 3. Pivot to wide:
+# rows   = group_var (x2.1)
+# cols   = outcome_var (x4.22_factor)
+# values = count
+pivot_table <- sql_result_clean %>%
+  pivot_wider(
+    names_from  = outcome_var,
+    values_from = count,
+    values_fill = list(count = 0)
+  )
+
+# 4. Add row totals and a final TOTAL row
+pivot_table_totals <- pivot_table %>%
+  # add total per row across all numeric columns
+  mutate(RowTotal = rowSums(across(where(is.numeric)))) %>%
+  # now bind a TOTAL row that sums each numeric column
+  bind_rows(
+    summarise(., across(where(is.numeric), sum)) %>%
+      mutate(group_var = "TOTAL",
+             RowTotal  = sum(RowTotal))
+  )
+
+# 5. View result
+print(pivot_table_totals)
+
+```
 
 
 

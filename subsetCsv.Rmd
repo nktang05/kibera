@@ -217,6 +217,17 @@ ids_to_delete <- sql_result[["x1.2"]]
 
 pregnancy <- pregnancy[ !x1.2 %in% ids_to_delete ]
 
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM pregnancy
+  WHERE [x2.2] = 2
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+pregnancy <- pregnancy[ !x1.2 %in% ids_to_delete ]
+
 # Columns to set to NA
 cols_to_nullify <- setdiff(
   cols_to_extract_pregnancy,
@@ -365,7 +376,7 @@ ids_to_delete <- sql_result[["x1.2"]]
 sexeducation <- sexeducation[ !x1.2 %in% ids_to_delete ]
 
 
-write.csv(education, "~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv", row.names = FALSE)
+write.csv(sexeducation, "~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv", row.names = FALSE)
 
 
 ```
@@ -374,7 +385,7 @@ write.csv(education, "~/Desktop/GRIT/Kibera/subsetCsv/sexeducation.csv", row.nam
 ```{r}
 # DEMOGRAPHICS
 
-cols_to_extract_demo <- c("x1.2", "x2.1", "x2.2", "x2.7", "x2.8", "x2.9", "x2.16", "x2.17")
+cols_to_extract_demo <- c("x1.1", "x1.2", "x2.1", "x2.2", "x2.7", "x2.8", "x2.9", "x2.16", "x2.17")
 
 # Subset the data
 demo <- AlldataClean[, cols_to_extract_demo, with = FALSE] 
@@ -391,6 +402,24 @@ ids_to_delete <- sql_result[["x1.2"]]
 demo <- demo[ !x1.2 %in% ids_to_delete ]
 
 demo <- demo[ !x1.2 %in% c(243, 473, 1010, 1016) ]
+
+sql_result <- sqldf("
+  SELECT
+    [x1.2]
+  FROM demo
+  WHERE [x2.7] IS NULL AND [x2.8] IS NULL AND [x2.9] IS NULL AND [x2.16] IS NULL AND [x2.17] IS NULL
+")
+
+ids_to_delete <- sql_result[["x1.2"]]
+
+# Remove rows by IDs
+demo <- demo[ !x1.2 %in% ids_to_delete ]
+
+# Remove specific IDs
+demo <- demo[ !x1.2 %in% c(243, 473, 1010, 1016) ]
+
+# Remove rows where x1.1 is NA or > 6
+demo <- demo[ !(is.na(x1.1) | x1.1 > 6) ]
 
 write.csv(demo, "~/Desktop/GRIT/Kibera/subsetCsv/demographics.csv", row.names = FALSE)
 

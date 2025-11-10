@@ -1,0 +1,211 @@
+---
+title: "makeDB"
+author: "Nicole Tang"
+date: "2025-10-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DBI)
+library(RSQLite)
+library(readr)
+library(dplyr)
+library(purrr)
+library(stringr)
+```
+
+## Make SQL DB
+
+```{r}
+
+
+# ==========================================================
+# 1. Set folder containing CSVs
+# ==========================================================
+csv_folder <- "~/Desktop/GRIT/Kibera/csv4db"    # <— change if necessary
+
+csv_files <- list.files(csv_folder,
+                        pattern = "\\.csv$",
+                        full.names = TRUE)
+
+
+# ==========================================================
+# 2. Create SQLite database
+# ==========================================================
+db_path <- file.path(csv_folder, "kibera_survey.sqlite")
+con <- dbConnect(SQLite(), db_path)
+dbExecute(con, "PRAGMA foreign_keys = ON;")
+
+# ==========================================================
+# 3. Fix x1_4 date formatting
+# ==========================================================
+fix_dates <- function(df) {
+
+    if ("x1_4" %in% names(df)) {
+
+        df$x1_4 <- as.character(df$x1_4)
+
+        df$x1_4 <- case_when(
+            # full ISO date already valid
+            grepl("^\\d{4}-\\d{2}-\\d{2}$", df$x1_4) ~ df$x1_4,
+
+            # 5-digit corrupted year-month (20165 → 2016-05-01)
+            grepl("^\\d{5}$", df$x1_4) ~ paste0(substr(df$x1_4, 1, 4),
+                                                "-0",
+                                                substr(df$x1_4, 5, 5),
+                                                "-01"),
+
+            # 4-digit year → set to Jan 1
+            grepl("^\\d{4}$", df$x1_4) ~ paste0(df$x1_4, "-01-01"),
+
+            # invalid → NA
+            TRUE ~ NA_character_
+        )
+    }
+
+    df
+}
+
+# ==========================================================
+# 4. Read + clean CSV files
+# ==========================================================
+read_clean_csv <- function(file) {
+    df <- read_csv(file, show_col_types = FALSE)
+
+    # clean column names
+    names(df) <- names(df) |>
+        str_replace_all("\\.", "_") |>
+        str_replace_all("\"", "") |>
+        str_trim()
+
+    # fix date column
+    df <- fix_dates(df)
+
+    if (!"x1_2" %in% names(df)) {
+        stop(paste("ERROR:", basename(file), "is missing x1.2 / x1_2"))
+    }
+
+    df
+}
+
+tables <- map(csv_files, read_clean_csv)
+names(tables) <- tools::file_path_sans_ext(basename(csv_files))
+
+# ==========================================================
+# 5. Identify master table (most participants)
+# ==========================================================
+unique_counts <- sapply(tables, function(x) length(unique(x$x1_2)))
+master_name <- names(which.max(unique_counts))
+master_df <- tables[[master_name]]
+
+cat("✅ Master table selected:", master_name, "\n")
+
+# ==========================================================
+# 6. Assign SQL types per your rule
+# ==========================================================
+assign_type <- function(colname) {
+
+    # TEXT exceptions
+    if (grepl("_TEXT$", colname) && colname != "x3_1_1_TEXT")
+        return("TEXT")
+
+    if (colname == "PHQ9Level")
+        return("TEXT")
+
+    # DATE exception
+    if (colname == "x1_4")
+        return("DATE")
+
+    # AGE variable (in *_TEXT name but numeric)
+    if (colname == "x3_1_1_TEXT")
+        return("INTEGER")
+
+    # everything else is integer-coded
+    return("INTEGER")
+}
+
+# ==========================================================
+# 7. Build SQL column definitions
+# ==========================================================
+make_col_defs <- function(df) {
+
+    sql_types <- map_chr(names(df), assign_type)
+
+    col_defs <- paste(
+        paste0(names(df), " ", sql_types),
+        collapse = ", "
+    )
+
+    return(col_defs)
+}
+
+# ==========================================================
+# 8. Create master table with PRIMARY KEY
+# ==========================================================
+master_defs <- make_col_defs(master_df)
+
+create_master_sql <- paste0("
+    CREATE TABLE master (
+        ", master_defs, ",
+        PRIMARY KEY(x1_2)
+    );
+")
+
+dbExecute(con, "DROP TABLE IF EXISTS master;")
+dbExecute(con, create_master_sql)
+dbWriteTable(con, "master", master_df, append = TRUE)
+
+# ==========================================================
+# 9. Create other module tables with FOREIGN KEY(x1_2)
+# ==========================================================
+for (nm in names(tables)) {
+
+    if (nm == master_name) next
+
+    df <- tables[[nm]]
+    sql_name <- nm
+
+    col_defs <- make_col_defs(df)
+
+    create_table_sql <- paste0("
+        CREATE TABLE ", sql_name, " (
+            ", col_defs, ",
+            FOREIGN KEY(x1_2) REFERENCES master(x1_2)
+        );
+    ")
+
+    dbExecute(con, paste0("DROP TABLE IF EXISTS ", sql_name, ";"))
+    dbExecute(con, create_table_sql)
+    dbWriteTable(con, sql_name, df, append = TRUE)
+}
+
+dbDisconnect(con)
+
+cat("\n✅ SUCCESS! All CSVs imported with correct DATA TYPES + CLEAN DATES →\n", db_path, "\n")
+
+
+```
+```{r}
+library(DBI)
+library(RSQLite)
+
+# Path to your DB
+db_path <- "~/Desktop/GRIT/Kibera/csv4db/kibera_survey.sqlite"
+
+# Connect
+con <- dbConnect(SQLite(), db_path)
+
+# List available tables
+dbListTables(con)
+
+```
+
+
+```{r}
+dbGetQuery(con, "SELECT * FROM master LIMIT 5;")
+dbGetQuery(con, "SELECT * FROM demographics LIMIT 5;")
+
+
+```
+
