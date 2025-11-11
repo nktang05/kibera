@@ -26,7 +26,7 @@ st.title("Kibera Survey Query Tool")
 # Codebook link
 st.markdown(
     """
-    <a href="https://docs.google.com/spreadsheets/d/.../edit"
+    <a href="https://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261"
        target="_blank"
        style="background-color:#007bff; padding:10px 18px; color:white; text-decoration:none; border-radius:5px;">
        Kibera Codebook
@@ -78,9 +78,9 @@ custom_results_area = st.empty()
 pivot_area = st.empty()
 pivot_download_area = st.empty()
 
-# ---------------------------------------------------
-# GROUPED QUERY EXECUTION
-# ---------------------------------------------------
+# ==========================================================
+# GROUPED QUERY
+# ==========================================================
 if run_group:
     sql = f"""
         SELECT {group_col} AS value, COUNT(*) AS count
@@ -90,7 +90,6 @@ if run_group:
     grouped_df = pd.read_sql(sql, con)
     grouped_area.dataframe(grouped_df)
 
-    # Download
     st.sidebar.download_button(
         "Download Grouped CSV",
         grouped_df.to_csv(index=False),
@@ -99,9 +98,9 @@ if run_group:
     )
 
 
-# ---------------------------------------------------
-# CUSTOM SQL EXECUTION
-# ---------------------------------------------------
+# ==========================================================
+# CUSTOM SQL
+# ==========================================================
 custom_df = None
 
 if run_custom:
@@ -109,7 +108,6 @@ if run_custom:
         custom_df = pd.read_sql(custom_sql, con)
         custom_results_area.dataframe(custom_df)
 
-        # CSV download
         st.download_button(
             "Download Custom Results CSV",
             custom_df.to_csv(index=False),
@@ -121,14 +119,13 @@ if run_custom:
         custom_results_area.error(f"Error: {e}")
 
 
-# ---------------------------------------------------
-# PIVOT TABLE (CUSTOM QUERY ONLY)
-# ---------------------------------------------------
-if enable_pivot and run_custom and custom_df is not None:
+# ==========================================================
+# PIVOT TABLE — only after custom query completes
+# ==========================================================
+if enable_pivot and (custom_df is not None):
 
     st.subheader("Pivot Table")
 
-    # Only allow pivot if results exist
     cols = custom_df.columns.tolist()
 
     pivot_row = st.sidebar.selectbox("Pivot Row:", cols)
@@ -139,11 +136,19 @@ if enable_pivot and run_custom and custom_df is not None:
 
         df = custom_df.copy()
 
-        # Expand summarized data if count column exists
+        # If user query returned summarized count data → expand
         if "count" in df.columns:
-            df = df.loc[df.index.repeat(df["count"].astype(int))]
+            try:
+                df = df.loc[df.index.repeat(df["count"].astype(int))].reset_index(drop=True)
+            except Exception:
+                st.error("Could not expand summarized count data — count column must be numeric.")
+                st.stop()
 
-        # Pivot using counts
+        # Convert NA to literal string for pivoting
+        df[pivot_row] = df[pivot_row].astype("string").fillna("NA")
+        df[pivot_col] = df[pivot_col].astype("string").fillna("NA")
+
+        # TRUE COUNTS
         pivot_table = (
             df.groupby([pivot_row, pivot_col])
               .size()
@@ -156,15 +161,14 @@ if enable_pivot and run_custom and custom_df is not None:
               )
         )
 
+        # Add row/column totals
         pivot_table["Total"] = pivot_table.sum(axis=1)
         total_row = pivot_table.sum(axis=0).to_frame().T
         total_row.index = ["Total"]
-
         pivot_table = pd.concat([pivot_table, total_row])
 
         pivot_area.dataframe(pivot_table)
 
-        # Download pivot csv
         pivot_download_area.download_button(
             "Download Pivot CSV",
             pivot_table.to_csv(),
