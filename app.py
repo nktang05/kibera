@@ -21,7 +21,6 @@ tables = pd.read_sql(
 st.set_page_config(page_title="Kibera Query Tool", layout="wide")
 
 st.title("Kibera User Interface")
-st.subheader("Nicole Tang — 2025")
 
 st.markdown("### Available Tables")
 st.markdown(", ".join(tables))
@@ -122,7 +121,7 @@ elif st.session_state.custom_df is not None:
 # ---------------------------------------------------
 if enable_pivot and st.session_state.custom_df is not None:
 
-    st.subheader("Pivot Table (From Custom Query Results)")
+    #st.subheader("Pivot Table (From Custom Query Results)")
 
     df = st.session_state.custom_df.copy()
     cols = df.columns.tolist()
