@@ -26,24 +26,13 @@ st.title("Kibera User Interface")
 
 st.markdown(
     """
-    <a href="hhttps://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261"
+    <a href="https://docs.google.com/spreadsheets/d/.../edit"
        target="_blank"
-       style="
-           display: inline-block;
-           padding: 10px 18px;
-           background-color: #1f77b4;
-           color: white;
-           border-radius: 6px;
-           text-decoration: none;
-           font-size: 16px;
-           font-weight: 500;
-           margin-top: 10px;
-           margin-bottom: 25px;
-       ">
+       style="background-color:#007bff; padding:10px 18px; color:white; text-decoration:none; border-radius:5px;">
        Kibera Codebook
     </a>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
 
