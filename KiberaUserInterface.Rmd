@@ -16,7 +16,7 @@ library(DT)
 library(stringr)
 
 # Path to your SQLite DB
-db_path <- "~/Desktop/GRIT/Kibera/csv4db/kibera_survey.sqlite"
+db_path <- file.path("csv4db", "kibera_survey.sqlite")
 
 # Connect
 con <- dbConnect(SQLite(), db_path)
@@ -35,7 +35,7 @@ fluidPage(
     tags$div(
         style = "margin-bottom: 15px;",
         tags$a(
-            href = "https://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261",
+            href = "https://docs.google.com/spreadsheets/d/.../edit",
             class = "btn btn-primary",
             target = "_blank",
             "Kibera Codebook"
@@ -47,22 +47,21 @@ fluidPage(
     sidebarLayout(
 
         sidebarPanel(
+
             h4("Choose Columns for Analysis"),
 
             #selectInput("value_col", "Column to Summarize:", master_columns),
             selectInput("group_col", "Group By:", master_columns),
-            actionButton("run_query", "Run Query"),   # ✅ FIXED — added comma
+            actionButton("run_query", "Run Query"),
 
             br(), br(),
             downloadButton("download_grouped", "Download Grouped Table as CSV"),
 
             hr(),
 
-            checkboxInput(
-                "enable_pivot",
-                "Enable Pivot Table for Custom Query",
-                value = FALSE
-            ),
+            checkboxInput("enable_pivot",
+                          "Enable Pivot Table for Custom Query",
+                          value = FALSE),
 
             uiOutput("pivot_selectors_ui")
         ),
@@ -88,9 +87,7 @@ fluidPage(
             actionButton("run_custom", "Run Custom Query", class = "btn-success"),
 
             br(), br(),
-
             downloadButton("download_custom", "Download Custom Query as CSV"),
-
             br(), br(),
 
             DTOutput("custom_results"),
@@ -100,88 +97,72 @@ fluidPage(
             h3("Pivot Table From Custom Query"),
             DTOutput("pivot_custom_table"),
             br(),
-            downloadButton("download_pivot", "Download Pivot Table as CSV")
+           downloadButton("download_pivot", "Download Pivot Table as CSV")
         )
     )
 )
 
-
 ```
 
 
-
-```
 
 
 
 ```{r, echo=FALSE}
 
 
-
+# ============= GROUPED QUERY =============
 observeEvent(input$run_query, {
 
-    req(input$group_col)
-
-    group_col <- input$group_col
+    g <- input$group_col
 
     sql <- paste0(
-        "SELECT ",
-        group_col, " AS group_value, ",
-        "COUNT(*) AS count ",
-        "FROM master ",
-        "GROUP BY ", group_col, ";"
+        "SELECT ", g, " AS group_value, COUNT(*) AS count
+         FROM master
+         GROUP BY ", g, ";"
     )
 
     grouped <- dbGetQuery(con, sql)
 
-    output$grouped_table <- renderDT({
-        datatable(grouped, rownames = FALSE)
-    })
+    output$grouped_table <- renderDT({ datatable(grouped) })
 
     output$download_grouped <- downloadHandler(
-        filename = function() paste0("grouped_results_", Sys.Date(), ".csv"),
-        content = function(file)
-            write.csv(grouped, file, row.names = FALSE)
+        filename = function() paste0("grouped_", Sys.Date(), ".csv"),
+        content = function(file) write.csv(grouped, file, row.names = FALSE)
     )
 })
 
 
 
+# ============= CUSTOM SQL QUERY =============
 custom_results_reactive <- reactiveVal(NULL)
 
 observeEvent(input$run_custom, {
 
     tryCatch({
 
-        res <- dbGetQuery(con, input$custom_sql)
-        custom_results_reactive(res)
+        df <- dbGetQuery(con, input$custom_sql)
+        custom_results_reactive(df)
 
-        output$custom_results <- renderDT({
-            datatable(res, rownames = FALSE)
-        })
+        output$custom_results <- renderDT({ datatable(df) })
 
     }, error = function(e) {
 
         output$custom_results <- renderDT({
-            datatable(data.frame(Error = e$message), rownames = FALSE)
+            datatable(data.frame(Error = e$message))
         })
 
     })
 })
 
-
-# ✅ Download custom SQL results
 output$download_custom <- downloadHandler(
-    filename = function() paste0("custom_query_results_", Sys.Date(), ".csv"),
-    content = function(file) {
-        df <- custom_results_reactive()
-        if (!is.null(df)) write.csv(df, file, row.names = FALSE)
-    }
+    filename = function() paste0("custom_query_", Sys.Date(), ".csv"),
+    content = function(file) write.csv(custom_results_reactive(), file, row.names = FALSE)
 )
 
 
 
-
+# ============= PIVOT TABLE =============
 output$pivot_selectors_ui <- renderUI({
 
     req(input$enable_pivot)
@@ -192,28 +173,24 @@ output$pivot_selectors_ui <- renderUI({
     tagList(
         selectInput("pivot_row", "Pivot Row:", choices = cols),
         selectInput("pivot_col", "Pivot Column:", choices = cols),
-        actionButton("run_pivot", "Generate Pivot Table", class = "btn-info"),
+        actionButton("run_pivot", "Generate Pivot Table"),
         br(), br()
     )
 })
 
-
 pivot_data_reactive <- reactiveVal(NULL)
 
-
 observeEvent(input$run_pivot, {
-
-    req(custom_results_reactive())
 
     df <- custom_results_reactive()
     df <- mutate_all(df, as.character)
 
-    # ✅ If SQL query included a 'count' column, expand back to row-level
+    # Expand if summarized
     if ("count" %in% names(df)) {
         df <- tidyr::uncount(df, weights = as.integer(df$count))
     }
 
-    # ✅ Always compute counts fresh for pivot
+    # Compute counts fresh
     pivot <- df |>
         group_by(.data[[input$pivot_row]], .data[[input$pivot_col]]) |>
         summarise(n = n(), .groups = "drop") |>
@@ -231,21 +208,17 @@ observeEvent(input$run_pivot, {
 
     pivot_data_reactive(pivot)
 
-    output$pivot_custom_table <- renderDT({
-        datatable(pivot, rownames = FALSE)
-    })
+    output$pivot_custom_table <- renderDT({ datatable(pivot) })
 })
 
 
-
-# ✅ Download pivot table
 output$download_pivot <- downloadHandler(
-    filename = function() paste0("pivot_table_", Sys.Date(), ".csv"),
-    content = function(file)
-        write.csv(pivot_data_reactive(), file, row.names = FALSE)
+    filename = function() paste0("pivot_", Sys.Date(), ".csv"),
+    content = function(file) write.csv(pivot_data_reactive(), file, row.names = FALSE)
 )
 
-
 ```
+
+
 
 
