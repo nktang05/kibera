@@ -8,34 +8,30 @@ import numpy as np
 
 # ==== SIMPLE BUILT-IN PASSWORD PROTECTION (no secrets needed) ====
 
+
+
 PASSWORD = "gritlab"
 
 def check_password():
     """Returns True if the user entered the correct password."""
     if "password_correct" not in st.session_state:
-        # First time the user enters a password
         st.session_state["password_correct"] = False
 
     if not st.session_state["password_correct"]:
         st.title("🔐 Password Required")
 
-        password_input = st.text_input("Enter password:", type="password")
+        pwd = st.text_input("Enter password:", type="password")
 
         if st.button("Submit"):
-            if password_input == PASSWORD:
+            if pwd == PASSWORD:
                 st.session_state["password_correct"] = True
-                st.experimental_rerun()
+                st.rerun()   # ✅ FIXED — this works on Streamlit Cloud
             else:
                 st.error("❌ Incorrect password. Try again.")
 
         return False
 
     return True
-
-
-# ✅ BLOCK the app until password is correct
-if not check_password():
-    st.stop()
 
 
 
