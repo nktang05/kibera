@@ -18,23 +18,25 @@ def check_password():
         st.session_state["password_correct"] = False
 
     if not st.session_state["password_correct"]:
-        st.title("🔐 Password Required")
+        st.title("🔐 Kibera User Interface — Login Required")
 
         pwd = st.text_input("Enter password:", type="password")
+        submit = st.button("Submit")
 
-        if st.button("Submit"):
+        if submit:
             if pwd == PASSWORD:
                 st.session_state["password_correct"] = True
-                st.rerun()   # ✅ FIXED — this works on Streamlit Cloud
+                st.rerun()  # ✅ correct for Streamlit Cloud
             else:
-                st.error("❌ Incorrect password. Try again.")
+                st.error("❌ Incorrect password")
 
         return False
 
     return True
 
-
-
+# ✅ HARD STOP if password is wrong
+if not check_password():
+    st.stop()
 # ---------------------------------------------------
 # CONNECT TO DATABASE
 # ---------------------------------------------------
