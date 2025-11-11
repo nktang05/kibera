@@ -26,7 +26,7 @@ st.title("Kibera User Interface")
 
 st.markdown(
     """
-    <a href="https://docs.google.com/spreadsheets/d/.../edit"
+    <a href="https://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261"
        target="_blank"
        style="background-color:#007bff; padding:10px 18px; color:white; text-decoration:none; border-radius:5px;">
        Kibera Codebook
