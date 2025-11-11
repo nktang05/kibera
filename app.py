@@ -1,95 +1,72 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
+import sqlite3
 
 # ---------------------------------------------------
 # CONNECT TO DATABASE
 # ---------------------------------------------------
-DB_PATH = "csv4db/kibera_survey.sqlite"
+DB_PATH = "csv4db/kibera_survey.sqlite"   # ✅ works on GitHub / Streamlit
 con = sqlite3.connect(DB_PATH)
 
-# Load master column list safely
-try:
-    master_columns = pd.read_sql("PRAGMA table_info(master);", con)["name"].tolist()
-except:
-    master_columns = []
-
+# ---------------------------------------------------
+# LOAD TABLE NAMES
+# ---------------------------------------------------
+tables = pd.read_sql(
+    "SELECT name FROM sqlite_master WHERE type='table';", con
+)["name"].tolist()
 
 # ---------------------------------------------------
-# PAGE SETTINGS
+# PAGE SETUP
 # ---------------------------------------------------
-st.set_page_config(page_title="Kibera Survey Query Tool", layout="wide")
+st.set_page_config(page_title="Kibera Query Tool", layout="wide")
 
 st.title("Kibera User Interface")
-st.write("Nicole Tang — 2025")
+st.subheader("Nicole Tang — 2025")
 
-# ---------------------------------------------------
-# SHOW DATABASE TABLE NAMES
-# ---------------------------------------------------
-st.subheader("Available Tables in Database")
-
-tables_df = pd.read_sql(
-    "SELECT name FROM sqlite_master WHERE type='table';",
-    con
-)
-table_names = tables_df["name"].tolist()
-
-if len(table_names) > 0:
-    cols = st.columns(len(table_names))
-    for i, t in enumerate(table_names):
-        cols[i].markdown(
-            f"""
-            <div style="
-                padding:8px 12px;
-                background-color:#f0f2f6;
-                border-radius:6px;
-                text-align:center;
-                font-weight:600;
-                border:1px solid #ddd;">
-                {t}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-st.download_button(
-    "Download Table List",
-    tables_df.to_csv(index=False),
-    file_name="database_tables.csv",
-    mime="text/csv"
-)
+st.markdown("### Available Tables")
+st.markdown(", ".join(tables))
 
 st.markdown("---")
 
+# ---------------------------------------------------
+# SESSION STATE SETUP
+# ---------------------------------------------------
+if "custom_df" not in st.session_state:
+    st.session_state.custom_df = None
+
+if "pivot_generated" not in st.session_state:
+    st.session_state.pivot_generated = False
 
 # ---------------------------------------------------
 # SIDEBAR — GROUPED QUERY
 # ---------------------------------------------------
 st.sidebar.header("Grouped Query")
 
-group_col = st.sidebar.selectbox("Group By:", master_columns)
+master_cols = pd.read_sql("PRAGMA table_info(master);", con)["name"].tolist()
+
+group_col = st.sidebar.selectbox("Group By:", master_cols)
 run_group = st.sidebar.button("Run Grouped Query")
 
 grouped_area = st.empty()
 
 # ---------------------------------------------------
-# SIDEBAR — PIVOT SETTINGS
+# SIDEBAR — PIVOT (CUSTOM ONLY)
 # ---------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("Pivot Table (Custom Query Only)")
 
 enable_pivot = st.sidebar.checkbox("Enable Pivot Table", value=False)
 
+pivot_row = None
+pivot_col = None
+
 # ---------------------------------------------------
-# MAIN — CUSTOM SQL
+# MAIN — CUSTOM SQL INPUT
 # ---------------------------------------------------
 st.subheader("Custom SQL Query")
 
-custom_sql = st.text_area(
-    "Enter SQL Query:",
-    value="SELECT * FROM master LIMIT 10;",
-    height=150
-)
+default_sql = "SELECT * FROM master LIMIT 10;"
+custom_sql = st.text_area("Enter SQL Query:", value=default_sql, height=180)
 
 run_custom = st.button("Run Custom Query")
 custom_results_area = st.empty()
@@ -101,14 +78,14 @@ pivot_download_area = st.empty()
 # GROUPED QUERY EXECUTION
 # ---------------------------------------------------
 if run_group:
-    sql = f"""
+    sql_group = f"""
         SELECT {group_col} AS value, COUNT(*) AS count
         FROM master
         GROUP BY {group_col};
     """
 
-    grouped_df = pd.read_sql(sql, con)
-    grouped_area.dataframe(grouped_df)
+    grouped_df = pd.read_sql(sql_group, con)
+    grouped_area.dataframe(grouped_df, use_container_width=True)
 
     st.sidebar.download_button(
         "Download Grouped CSV",
@@ -117,20 +94,18 @@ if run_group:
         mime="text/csv"
     )
 
-
 # ---------------------------------------------------
-# CUSTOM SQL EXECUTION
+# CUSTOM QUERY EXECUTION WITH STATE
 # ---------------------------------------------------
-custom_df = None
-
 if run_custom:
     try:
-        custom_df = pd.read_sql(custom_sql, con)
-        custom_results_area.dataframe(custom_df)
+        st.session_state.custom_df = pd.read_sql(custom_sql, con)
+        st.session_state.pivot_generated = False  # reset pivot flag
+        custom_results_area.dataframe(st.session_state.custom_df, use_container_width=True)
 
         st.download_button(
             "Download Custom Results CSV",
-            custom_df.to_csv(index=False),
+            st.session_state.custom_df.to_csv(index=False),
             file_name="custom_query_results.csv",
             mime="text/csv"
         )
@@ -138,39 +113,42 @@ if run_custom:
     except Exception as e:
         custom_results_area.error(f"Error: {e}")
 
+elif st.session_state.custom_df is not None:
+    # Show stored data without rerunning SQL
+    custom_results_area.dataframe(st.session_state.custom_df, use_container_width=True)
 
 # ---------------------------------------------------
-# PIVOT TABLE GENERATION
+# PIVOT TABLE (ON STORED CUSTOM QUERY)
 # ---------------------------------------------------
-if enable_pivot and run_custom and custom_df is not None:
+if enable_pivot and st.session_state.custom_df is not None:
 
-    st.subheader("Pivot Table From Custom Query")
+    st.subheader("Pivot Table (From Custom Query Results)")
 
-    cols = custom_df.columns.tolist()
+    df = st.session_state.custom_df.copy()
+    cols = df.columns.tolist()
 
     pivot_row = st.sidebar.selectbox("Pivot Row:", cols)
     pivot_col = st.sidebar.selectbox("Pivot Column:", cols)
+
     run_pivot = st.sidebar.button("Generate Pivot Table")
 
     if run_pivot:
+        df2 = df.copy()
 
-        df = custom_df.copy()
+        # Expand rows if summarized count exists
+        if "count" in df2.columns:
+            df2 = df2.loc[df2.index.repeat(df2["count"].astype(int))]
 
-        # Expand summarized count data
-        if "count" in df.columns:
-            df = df.loc[df.index.repeat(df["count"].astype(int))]
-
-        # Correct pivot — always counts rows
         pivot = (
-            df.groupby([pivot_row, pivot_col])
-              .size()
-              .reset_index(name="count")
-              .pivot_table(
-                  index=pivot_row,
-                  columns=pivot_col,
-                  values="count",
-                  fill_value=0
-              )
+            df2.groupby([pivot_row, pivot_col])
+               .size()
+               .reset_index(name="count")
+               .pivot_table(
+                   index=pivot_row,
+                   columns=pivot_col,
+                   values="count",
+                   fill_value=0
+               )
         )
 
         pivot["Total"] = pivot.sum(axis=1)
@@ -179,11 +157,16 @@ if enable_pivot and run_custom and custom_df is not None:
 
         pivot = pd.concat([pivot, total_row])
 
-        pivot_area.dataframe(pivot)
+        st.session_state.pivot_generated = True
+        st.session_state.pivot_table = pivot
+
+    # ✅ Keep showing pivot table without resetting
+    if st.session_state.pivot_generated:
+        pivot_area.dataframe(st.session_state.pivot_table, use_container_width=True)
 
         pivot_download_area.download_button(
             "Download Pivot CSV",
-            pivot.to_csv(),
+            st.session_state.pivot_table.to_csv(),
             file_name="pivot_table.csv",
             mime="text/csv"
         )
