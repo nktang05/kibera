@@ -1,41 +1,66 @@
 import streamlit as st
-import pandas as pd
 import sqlite3
-import numpy as np
+import pandas as pd
 
 # ---------------------------------------------------
-# DATABASE CONNECTION
+# CONNECT TO DATABASE
 # ---------------------------------------------------
 DB_PATH = "csv4db/kibera_survey.sqlite"
+con = sqlite3.connect(DB_PATH)
 
-def get_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+# Load master column list safely
+try:
+    master_columns = pd.read_sql("PRAGMA table_info(master);", con)["name"].tolist()
+except:
+    master_columns = []
 
-con = get_connection()
-
-# list columns from master table
-master_columns = pd.read_sql("PRAGMA table_info(master);", con)["name"].tolist()
 
 # ---------------------------------------------------
-# STREAMLIT LAYOUT
+# PAGE SETTINGS
 # ---------------------------------------------------
 st.set_page_config(page_title="Kibera Survey Query Tool", layout="wide")
 
-st.title("Kibera Survey Query Tool")
+st.title("Kibera User Interface")
+st.write("Nicole Tang — 2025")
 
-# Codebook link
-st.markdown(
-    """
-    <a href="https://docs.google.com/spreadsheets/d/1J9xJLYzacIQPhaeuDCdkEWLOpli0vMrk72n_T1QTtGE/edit?gid=1118359261#gid=1118359261"
-       target="_blank"
-       style="background-color:#007bff; padding:10px 18px; color:white; text-decoration:none; border-radius:5px;">
-       Kibera Codebook
-    </a>
-    """,
-    unsafe_allow_html=True
+# ---------------------------------------------------
+# SHOW DATABASE TABLE NAMES
+# ---------------------------------------------------
+st.subheader("Available Tables in Database")
+
+tables_df = pd.read_sql(
+    "SELECT name FROM sqlite_master WHERE type='table';",
+    con
+)
+table_names = tables_df["name"].tolist()
+
+if len(table_names) > 0:
+    cols = st.columns(len(table_names))
+    for i, t in enumerate(table_names):
+        cols[i].markdown(
+            f"""
+            <div style="
+                padding:8px 12px;
+                background-color:#f0f2f6;
+                border-radius:6px;
+                text-align:center;
+                font-weight:600;
+                border:1px solid #ddd;">
+                {t}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+st.download_button(
+    "Download Table List",
+    tables_df.to_csv(index=False),
+    file_name="database_tables.csv",
+    mime="text/csv"
 )
 
 st.markdown("---")
+
 
 # ---------------------------------------------------
 # SIDEBAR — GROUPED QUERY
@@ -45,24 +70,18 @@ st.sidebar.header("Grouped Query")
 group_col = st.sidebar.selectbox("Group By:", master_columns)
 run_group = st.sidebar.button("Run Grouped Query")
 
-# Placeholder for grouped results
 grouped_area = st.empty()
 
-
 # ---------------------------------------------------
-# SIDEBAR — CUSTOM SQL
+# SIDEBAR — PIVOT SETTINGS
 # ---------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("Pivot Table (Custom Query Only)")
 
 enable_pivot = st.sidebar.checkbox("Enable Pivot Table", value=False)
 
-pivot_row = None
-pivot_col = None
-
-
 # ---------------------------------------------------
-# MAIN PAGE — CUSTOM SQL INPUT
+# MAIN — CUSTOM SQL
 # ---------------------------------------------------
 st.subheader("Custom SQL Query")
 
@@ -78,15 +97,16 @@ custom_results_area = st.empty()
 pivot_area = st.empty()
 pivot_download_area = st.empty()
 
-# ==========================================================
-# GROUPED QUERY
-# ==========================================================
+# ---------------------------------------------------
+# GROUPED QUERY EXECUTION
+# ---------------------------------------------------
 if run_group:
     sql = f"""
         SELECT {group_col} AS value, COUNT(*) AS count
         FROM master
         GROUP BY {group_col};
     """
+
     grouped_df = pd.read_sql(sql, con)
     grouped_area.dataframe(grouped_df)
 
@@ -98,9 +118,9 @@ if run_group:
     )
 
 
-# ==========================================================
-# CUSTOM SQL
-# ==========================================================
+# ---------------------------------------------------
+# CUSTOM SQL EXECUTION
+# ---------------------------------------------------
 custom_df = None
 
 if run_custom:
@@ -119,12 +139,12 @@ if run_custom:
         custom_results_area.error(f"Error: {e}")
 
 
-# ==========================================================
-# PIVOT TABLE — only after custom query completes
-# ==========================================================
-if enable_pivot and (custom_df is not None):
+# ---------------------------------------------------
+# PIVOT TABLE GENERATION
+# ---------------------------------------------------
+if enable_pivot and run_custom and custom_df is not None:
 
-    st.subheader("Pivot Table")
+    st.subheader("Pivot Table From Custom Query")
 
     cols = custom_df.columns.tolist()
 
@@ -136,20 +156,12 @@ if enable_pivot and (custom_df is not None):
 
         df = custom_df.copy()
 
-        # If user query returned summarized count data → expand
+        # Expand summarized count data
         if "count" in df.columns:
-            try:
-                df = df.loc[df.index.repeat(df["count"].astype(int))].reset_index(drop=True)
-            except Exception:
-                st.error("Could not expand summarized count data — count column must be numeric.")
-                st.stop()
+            df = df.loc[df.index.repeat(df["count"].astype(int))]
 
-        # Convert NA to literal string for pivoting
-        df[pivot_row] = df[pivot_row].astype("string").fillna("NA")
-        df[pivot_col] = df[pivot_col].astype("string").fillna("NA")
-
-        # TRUE COUNTS
-        pivot_table = (
+        # Correct pivot — always counts rows
+        pivot = (
             df.groupby([pivot_row, pivot_col])
               .size()
               .reset_index(name="count")
@@ -161,17 +173,17 @@ if enable_pivot and (custom_df is not None):
               )
         )
 
-        # Add row/column totals
-        pivot_table["Total"] = pivot_table.sum(axis=1)
-        total_row = pivot_table.sum(axis=0).to_frame().T
+        pivot["Total"] = pivot.sum(axis=1)
+        total_row = pivot.sum(axis=0).to_frame().T
         total_row.index = ["Total"]
-        pivot_table = pd.concat([pivot_table, total_row])
 
-        pivot_area.dataframe(pivot_table)
+        pivot = pd.concat([pivot, total_row])
+
+        pivot_area.dataframe(pivot)
 
         pivot_download_area.download_button(
             "Download Pivot CSV",
-            pivot_table.to_csv(),
+            pivot.to_csv(),
             file_name="pivot_table.csv",
             mime="text/csv"
         )
