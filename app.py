@@ -18,7 +18,7 @@ def check_password():
         st.session_state["password_correct"] = False
 
     if not st.session_state["password_correct"]:
-        st.title("🔐 Kibera User Interface — Login Required")
+        st.title("Kibera User Interface ")
 
         pwd = st.text_input("Enter password:", type="password")
         submit = st.button("Submit")
