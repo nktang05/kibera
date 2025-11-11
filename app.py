@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import numpy as np
 
 # ---------------------------------------------------
 # CONNECT TO DATABASE
 # ---------------------------------------------------
-DB_PATH = "csv4db/kibera_survey.sqlite"   # ✅ works on GitHub / Streamlit
+DB_PATH = "csv4db/kibera_survey.sqlite"
 con = sqlite3.connect(DB_PATH)
 
 # ---------------------------------------------------
@@ -15,26 +16,30 @@ tables = pd.read_sql(
     "SELECT name FROM sqlite_master WHERE type='table';", con
 )["name"].tolist()
 
+
 # ---------------------------------------------------
-# PAGE SETUP
+# PAGE CONFIG
 # ---------------------------------------------------
 st.set_page_config(page_title="Kibera Query Tool", layout="wide")
 
 st.title("Kibera User Interface")
+st.subheader("Nicole Tang — 2025")
 
 st.markdown("### Available Tables")
 st.markdown(", ".join(tables))
 
 st.markdown("---")
 
+
 # ---------------------------------------------------
-# SESSION STATE SETUP
+# SESSION STATE
 # ---------------------------------------------------
 if "custom_df" not in st.session_state:
     st.session_state.custom_df = None
 
 if "pivot_generated" not in st.session_state:
     st.session_state.pivot_generated = False
+
 
 # ---------------------------------------------------
 # SIDEBAR — GROUPED QUERY
@@ -48,8 +53,9 @@ run_group = st.sidebar.button("Run Grouped Query")
 
 grouped_area = st.empty()
 
+
 # ---------------------------------------------------
-# SIDEBAR — PIVOT (CUSTOM ONLY)
+# SIDEBAR — PIVOT
 # ---------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("Pivot Table (Custom Query Only)")
@@ -59,8 +65,9 @@ enable_pivot = st.sidebar.checkbox("Enable Pivot Table", value=False)
 pivot_row = None
 pivot_col = None
 
+
 # ---------------------------------------------------
-# MAIN — CUSTOM SQL INPUT
+# MAIN PAGE — CUSTOM SQL
 # ---------------------------------------------------
 st.subheader("Custom SQL Query")
 
@@ -73,14 +80,17 @@ custom_results_area = st.empty()
 pivot_area = st.empty()
 pivot_download_area = st.empty()
 
+
 # ---------------------------------------------------
-# GROUPED QUERY EXECUTION
+# GROUPED QUERY EXECUTION (INCLUDE NA)
 # ---------------------------------------------------
 if run_group:
     sql_group = f"""
-        SELECT {group_col} AS value, COUNT(*) AS count
+        SELECT 
+            COALESCE(CAST({group_col} AS TEXT), 'NA') AS value,
+            COUNT(*) AS count
         FROM master
-        GROUP BY {group_col};
+        GROUP BY COALESCE(CAST({group_col} AS TEXT), 'NA');
     """
 
     grouped_df = pd.read_sql(sql_group, con)
@@ -93,18 +103,25 @@ if run_group:
         mime="text/csv"
     )
 
+
 # ---------------------------------------------------
-# CUSTOM QUERY EXECUTION WITH STATE
+# CUSTOM QUERY EXECUTION (PRESERVE NA)
 # ---------------------------------------------------
 if run_custom:
     try:
-        st.session_state.custom_df = pd.read_sql(custom_sql, con)
-        st.session_state.pivot_generated = False  # reset pivot flag
-        custom_results_area.dataframe(st.session_state.custom_df, use_container_width=True)
+        df = pd.read_sql(custom_sql, con)
+
+        # ✅ Keep NA values — do NOT auto-remove
+        df = df.replace({None: np.nan})
+
+        st.session_state.custom_df = df
+        st.session_state.pivot_generated = False  # reset pivot state
+
+        custom_results_area.dataframe(df, use_container_width=True)
 
         st.download_button(
             "Download Custom Results CSV",
-            st.session_state.custom_df.to_csv(index=False),
+            df.to_csv(index=False),
             file_name="custom_query_results.csv",
             mime="text/csv"
         )
@@ -113,17 +130,21 @@ if run_custom:
         custom_results_area.error(f"Error: {e}")
 
 elif st.session_state.custom_df is not None:
-    # Show stored data without rerunning SQL
     custom_results_area.dataframe(st.session_state.custom_df, use_container_width=True)
 
+
 # ---------------------------------------------------
-# PIVOT TABLE (ON STORED CUSTOM QUERY)
+# PIVOT TABLE EXECUTION (INCLUDE NA)
 # ---------------------------------------------------
 if enable_pivot and st.session_state.custom_df is not None:
 
-    #st.subheader("Pivot Table (From Custom Query Results)")
+    st.subheader("Pivot Table (From Custom Query Results)")
 
     df = st.session_state.custom_df.copy()
+
+    # ensure NA is preserved and treated as category
+    df = df.astype("object").where(pd.notnull(df), "NA")
+
     cols = df.columns.tolist()
 
     pivot_row = st.sidebar.selectbox("Pivot Row:", cols)
@@ -132,22 +153,25 @@ if enable_pivot and st.session_state.custom_df is not None:
     run_pivot = st.sidebar.button("Generate Pivot Table")
 
     if run_pivot:
+
         df2 = df.copy()
 
-        # Expand rows if summarized count exists
+        # ✅ Expand summarized rows if count column exists
         if "count" in df2.columns:
             df2 = df2.loc[df2.index.repeat(df2["count"].astype(int))]
 
+        # ✅ Pivot INCLUDING NA as category
         pivot = (
-            df2.groupby([pivot_row, pivot_col])
-               .size()
-               .reset_index(name="count")
-               .pivot_table(
-                   index=pivot_row,
-                   columns=pivot_col,
-                   values="count",
-                   fill_value=0
-               )
+            df2.groupby([pivot_row, pivot_col], dropna=False)
+            .size()
+            .reset_index(name="count")
+            .pivot_table(
+                index=pivot_row,
+                columns=pivot_col,
+                values="count",
+                fill_value=0,
+                dropna=False
+            )
         )
 
         pivot["Total"] = pivot.sum(axis=1)
@@ -159,7 +183,7 @@ if enable_pivot and st.session_state.custom_df is not None:
         st.session_state.pivot_generated = True
         st.session_state.pivot_table = pivot
 
-    # ✅ Keep showing pivot table without resetting
+    # ✅ Display pivot without clearing results
     if st.session_state.pivot_generated:
         pivot_area.dataframe(st.session_state.pivot_table, use_container_width=True)
 
